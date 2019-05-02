@@ -1,5 +1,6 @@
 import numpy as np
-from sklearn.preprocessing import normalize
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 class Vermiculus:
@@ -34,7 +35,12 @@ class Vermiculus:
         self.current_point = point + vec
 
     def translate_dna(self):
-        
+        for acid in self.dna:
+            self.update_point(acid)
+            self.phenotype.append(self.current_point)
+
+    def draw_phenotype(self):
+        for
 
     @staticmethod
     def rotate_vector(xy, radians):
@@ -51,3 +57,5 @@ class Vermiculus:
 if __name__ == "__main__":
     worm = Vermiculus(1)
     print(worm.dna)
+    worm.translate_dna()
+    print(worm.phenotype)
