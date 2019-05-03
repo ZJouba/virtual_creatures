@@ -130,7 +130,7 @@ class Vermiculus:
 
 if __name__ == "__main__":
     worm = Vermiculus(1)
-    print(worm.dna)
+    # print(worm.dna)
     worm.translate_dna()
-    print(worm.phenotype)
+    # print(worm.phenotype)
     worm.draw_phenotype()
