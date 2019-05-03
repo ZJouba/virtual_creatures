@@ -1,0 +1,24 @@
+# Sharing an environment
+
+You may want to share your environment with someone else---for example, so they can re-create a test that you have done. To allow them to quickly reproduce your environment, with all of its packages and versions, give them a copy of your environment.yml file.
+Exporting the environment file
+
+Note
+
+If you already have an environment.yml file in your current directory, it will be overwritten during this task.
+
+
+    Activate the environment to export:
+
+            conda activate myenv
+
+                    Note: Replace myenv with the name of the environment.
+
+    Export your active environment to a new file:
+
+            conda env export > environment.yml
+
+                    Note: This file handles both the environment's pip packages and conda packages.
+
+    Email or copy the exported environment.yml file to the other person.
+
