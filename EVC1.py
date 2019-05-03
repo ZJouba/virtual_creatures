@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from shapely.geometry import LineString
 from descartes.patch import PolygonPatch
+from tqdm import tqdm
 
 
 class Vermiculus:
@@ -11,7 +12,7 @@ class Vermiculus:
     dna_length = 60
     angle = np.pi/4
     unit_length = 1.0
-    unit_width = 0.5
+    unit_width = 1.0
     amino_acids = ["F", "L", "R"]
     amino_probabilities = [0.4, 0.3, 0.3]
     proteins = {"F": 0.0,
@@ -39,6 +40,7 @@ class Vermiculus:
         self.dna = self.transcribe_dna()
         self.topology = None
         self.topology_dilated = None
+        self.area = None
 
     def transcribe_dna(self):
         """
@@ -124,8 +126,8 @@ class Vermiculus:
         ax.add_patch(patch1)
         x, y = line.xy
         ax.plot(x, y, color='#999999')
-        # ax.set_xlim(-1, 4)
-        # ax.set_ylim(-1, 3)
+
+        plt.show()
 
     @staticmethod
     def rotate_vector(xy, radians):
@@ -150,9 +152,17 @@ class Vermiculus:
 
 
 if __name__ == "__main__":
+    # areas = []
+    # for i in tqdm(range(1000)):
+    #     worm = Vermiculus(i)
+    #     worm.build_topology()
+    #     areas.append(worm.area)
+    #     # worm.build_topology()
     worm = Vermiculus(1)
     # print(worm.dna)
     worm.build_topology()
     # print(worm.phenotype)
     worm.draw_phenotype()
-    print(worm.area)
+    # print(worm.area)
+    # print(worm.topology.is_simple)
+    # plt.hist(areas, bins=50)
