@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import shapely
+from shapely.geometry import LineString
+from descartes.patch import PolygonPatch
 
 
 class Vermiculus:
@@ -10,6 +11,7 @@ class Vermiculus:
     dna_length = 60
     angle = np.pi/4
     unit_length = 1.0
+    unit_width = 0.5
     amino_acids = ["F", "L", "R"]
     amino_probabilities = [0.4, 0.3, 0.3]
     proteins = {"F": 0.0,
@@ -31,10 +33,12 @@ class Vermiculus:
             the index for the instance of the worm
         """
         self.instance_number = instance_number
-        self.dna = self.transcribe_dna()
         self.current_point = starting_point
         self.current_vector = starting_vector
         self.phenotype = [self.current_point]
+        self.dna = self.transcribe_dna()
+        self.topology = None
+        self.topology_dilated = None
 
     def transcribe_dna(self):
         """
@@ -81,7 +85,7 @@ class Vermiculus:
         vec = self.current_vector
         self.current_point = point + vec
 
-    def translate_dna(self):
+    def _translate_dna(self):
         """
         read the DNA sequence and build up a string of segment end points.
         Returns
@@ -92,6 +96,18 @@ class Vermiculus:
             self.update_point(acid)
             self.phenotype.append(self.current_point)
 
+    def build_topology(self):
+        """
+        Translate the phenotype to the topology
+        Returns
+        -------
+
+        """
+        self._translate_dna()
+        self.topology = LineString(self.phenotype)
+        self.topology_dilated = self.topology.buffer(self.unit_width)
+        self.area = self.topology_dilated.area
+
     def draw_phenotype(self):
         """
         Sketch out the worm.
@@ -99,12 +115,17 @@ class Vermiculus:
         -------
 
         """
-        xx, yy = [], []
-        for point in self.phenotype:
-            x, y = point
-            xx.append(x)
-            yy.append(y)
-        plt.plot(xx, yy)
+        fig = plt.figure(1, figsize=(10, 4), dpi=180)
+
+        line = LineString(self.phenotype)
+        ax = fig.add_subplot(121)
+        dilated = line.buffer(0.5)
+        patch1 = PolygonPatch(dilated, facecolor='#99ccff', edgecolor='#6699cc')
+        ax.add_patch(patch1)
+        x, y = line.xy
+        ax.plot(x, y, color='#999999')
+        # ax.set_xlim(-1, 4)
+        # ax.set_ylim(-1, 3)
 
     @staticmethod
     def rotate_vector(xy, radians):
@@ -131,6 +152,7 @@ class Vermiculus:
 if __name__ == "__main__":
     worm = Vermiculus(1)
     # print(worm.dna)
-    worm.translate_dna()
+    worm.build_topology()
     # print(worm.phenotype)
     worm.draw_phenotype()
+    print(worm.area)
