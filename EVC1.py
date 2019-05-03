@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import shapely
 
 
 class Vermiculus:
@@ -15,18 +16,24 @@ class Vermiculus:
                 "L": -1 * angle,
                 "R": angle}
 
-    def __init__(self, instance_number):
+    def __init__(self,
+                 instance_number,
+                 starting_point=np.array([0, 0]),
+                 starting_vector=np.array([0, 1]),
+                 ):
         """
         Initialise a worm
         Parameters
         ----------
+        starting_point : array like
+            a 2d vector containing the strarting point for the worm
         instance_number: int
             the index for the instance of the worm
         """
         self.instance_number = instance_number
         self.dna = self.transcribe_dna()
-        self.current_point = np.array([0, 0])
-        self.current_vector = np.array([1, 0])
+        self.current_point = starting_point
+        self.current_vector = starting_vector
         self.phenotype = [self.current_point]
 
     def transcribe_dna(self):
