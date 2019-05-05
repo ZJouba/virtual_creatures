@@ -63,3 +63,8 @@ class Bag(object):
             self.array[i] = val
         return self.array
 
+aaa = {"a": 2,
+       "b": 3}
+
+for key, value in aaa.items():
+    print(key, value)
