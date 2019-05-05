@@ -3,37 +3,35 @@ import matplotlib.pyplot as plt
 from shapely.geometry import LineString
 from descartes.patch import PolygonPatch
 from tqdm import tqdm
-from numba import jitclass          # import the decorator
-from numba import int32, float32    # import the types
-from numba import jit, njit
 
 
-# spec = [
-#     ('instance_number', int32),               # a simple scalar field
-#     ('area', float32[:]),          # an array field
-#     ('dna_length', int32),               # a simple scalar field
-#     ('angle', float32),          # an array field
-#     ('unit_length', float32),          # an array field
-#     ('unit_width', float32),          # an array field
-# ]
-#
-# @jitclass(spec)
+class Amino_acid(object):
+    def __init__(self, name, protein, probability,):
+        self.probability = probability
+        self.protein = protein
+        self.name = name
+
+
+
+class Amino_acids(object):
+    def __init__(self):
+        self.proteins = {"F": 0.0,
+                         "L": -1 * np.pi / 4,
+                         "R": np.pi / 4}
+        self.amino_acids = list(self.proteins.keys())
+        self.amino_probabilities = [0.4, 0.3, 0.3]
+
+
 class Vermiculus(object):
     """
     Makes a worm like creature
     """
-    amino_acids = ["F", "L", "R"]
-    amino_probabilities = [0.4, 0.3, 0.3]
-    proteins = {"F": 0.0,
-                "L": -1 * np.pi / 4,
-                "R": np.pi / 4}
-
     def __init__(self,
                  instance_number,
+                 amino_acids,
                  starting_point=np.array([0, 0]),
                  starting_vector=np.array([0, 1]),
                  dna_length=60,
-                 # angle=np.pi / 4,
                  unit_length=1.0,
                  unit_width=1.0,
                  ):
@@ -46,11 +44,11 @@ class Vermiculus(object):
         instance_number: int
             the index for the instance of the worm
         """
+        self.amino_acids = Amino_acids
         self.instance_number = instance_number
         self.current_point = starting_point
         self.current_vector = starting_vector
         self.dna_length = dna_length
-        # self.angle = angle
         self.unit_length = unit_length
         self.unit_width = unit_width
         self.phenotype = [self.current_point]
@@ -167,22 +165,13 @@ class Vermiculus(object):
         m = np.dot(j, [x, y])
         return np.array([float(m.T[0]), float(m.T[1])])
 
-@jit
-def get_areas(population):
-    area = []
-    for i in range(population):
-        worm = Vermiculus(i)
-        worm.build_topology()
-        area.append(worm.area)
-    return area
-
 
 if __name__ == "__main__":
     # pop = 100
     # areas = np.zeros(pop, dtype=np.float32)
     # areas = get_areas(pop)
     areas = []
-    for i in tqdm(range(50000)):
+    for i in tqdm(range(5000)):
         worm = Vermiculus(i)
         worm.build_topology()
         areas.append(worm.area)
