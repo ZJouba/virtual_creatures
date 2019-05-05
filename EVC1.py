@@ -5,21 +5,15 @@ from descartes.patch import PolygonPatch
 from tqdm import tqdm
 
 
-class Amino_acid(object):
-    def __init__(self, name, protein, probability,):
-        self.probability = probability
-        self.protein = protein
-        self.name = name
-
-
-
-class Amino_acids(object):
-    def __init__(self):
-        self.proteins = {"F": 0.0,
-                         "L": -1 * np.pi / 4,
-                         "R": np.pi / 4}
-        self.amino_acids = list(self.proteins.keys())
-        self.amino_probabilities = [0.4, 0.3, 0.3]
+# class Amino_acids(object):
+#     def __init__(self):
+#
+#
+#     class Amino_acid(object):
+#         def __init__(self, name, protein, probability, ):
+#             self.probability = probability
+#             self.protein = protein
+#             self.name = name
 
 
 class Vermiculus(object):
@@ -28,7 +22,6 @@ class Vermiculus(object):
     """
     def __init__(self,
                  instance_number,
-                 amino_acids,
                  starting_point=np.array([0, 0]),
                  starting_vector=np.array([0, 1]),
                  dna_length=60,
@@ -44,13 +37,18 @@ class Vermiculus(object):
         instance_number: int
             the index for the instance of the worm
         """
-        self.amino_acids = Amino_acids
         self.instance_number = instance_number
         self.current_point = starting_point
         self.current_vector = starting_vector
         self.dna_length = dna_length
         self.unit_length = unit_length
         self.unit_width = unit_width
+        self.proteins = {"F": 0.0,
+                         "L": -1 * np.pi / 4,
+                         "R": np.pi / 4}
+        self.amino_acids = list(self.proteins.keys())
+        self.amino_probabilities = [0.4, 0.3, 0.3]
+
         self.phenotype = [self.current_point]
         self.dna = self.transcribe_dna()
         self.topology = None
@@ -132,14 +130,15 @@ class Vermiculus(object):
         -------
 
         """
-        fig = plt.figure(1, figsize=(10, 4), dpi=180)
+        fig = plt.figure(1, figsize=(5, 5), dpi=180)
 
         line = LineString(self.phenotype)
-        ax = fig.add_subplot(121)
+        ax = fig.add_subplot(111)
         dilated = line.buffer(0.5)
         patch1 = PolygonPatch(dilated, facecolor='#99ccff', edgecolor='#6699cc')
         ax.add_patch(patch1)
         x, y = line.xy
+        plt.axis('equal')
         ax.plot(x, y, color='#999999')
 
         plt.show()
@@ -166,21 +165,21 @@ class Vermiculus(object):
         return np.array([float(m.T[0]), float(m.T[1])])
 
 
-if __name__ == "__main__":
-    # pop = 100
-    # areas = np.zeros(pop, dtype=np.float32)
-    # areas = get_areas(pop)
+def scan_population(num):
     areas = []
-    for i in tqdm(range(5000)):
+    for i in tqdm(range(num)):
         worm = Vermiculus(i)
         worm.build_topology()
         areas.append(worm.area)
-    # worm.build_topology()
-    # worm = Vermiculus(1)
-    # # print(worm.dna)
-    # worm.build_topology()
-    # # print(worm.phenotype)
-    # worm.draw_phenotype()
-    # # print(worm.area)
-    # # print(worm.topology.is_simple)
     plt.hist(areas, bins=50)
+
+
+def make_one_worm():
+    worm = Vermiculus(i)
+    worm.build_topology()
+    worm.draw_phenotype()
+
+
+if __name__ == "__main__":
+    # scan_population(500)
+    make_one_worm()
