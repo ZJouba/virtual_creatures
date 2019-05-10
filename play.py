@@ -68,3 +68,34 @@ aaa = {"a": 2,
 
 for key, value in aaa.items():
     print(key, value)
+
+
+
+
+import numpy as np
+from scipy.spatial.transform import Rotation
+starting_point=np.array([0, 0])
+starting_vector=np.array([0, 1])
+
+r = Rotation.from_euler('z', -90, degrees=True)
+
+vec = np.append(starting_vector, [0])
+
+print(r.apply(vec))
+
+def next_point(angle, vec, dist, point):
+    r = Rotation.from_euler('z', angle, degrees=True)
+    vec = np.append(vec, [0])
+    vec = r.apply(vec)[:2]
+    vec = dist * (vec / np.linalg.norm(vec))
+    point = point + vec
+    return point, vec
+
+
+starting_point=np.array([0, 0])
+starting_vector=np.array([0, 1])
+print(next_point(90, starting_vector, 2, starting_point))
+
+
+
+
