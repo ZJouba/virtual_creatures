@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from shapely.geometry import LineString
+from shapely.geometry import LineString, MultiLineString, Point
 from descartes.patch import PolygonPatch
 from tqdm import tqdm
 from scipy.spatial.transform import Rotation
@@ -44,17 +44,18 @@ def draw_phenotype(phenotype):
 
     """
     fig = plt.figure(1, figsize=(5, 5), dpi=180)
-
-    line = LineString(phenotype)
     ax = fig.add_subplot(111)
-    dilated = line.buffer(0.5)
-    patch1 = PolygonPatch(dilated, facecolor='#99ccff', edgecolor='#6699cc')
-    ax.add_patch(patch1)
-    x, y = line.xy
-    plt.axis('equal')
-    ax.plot(x, y, color='#999999')
+    for line in phenotype:
+        line = LineString(line)
 
-    plt.show()
+        dilated = line.buffer(0.5)
+        patch1 = PolygonPatch(dilated, facecolor='#99ccff', edgecolor='#6699cc')
+        ax.add_patch(patch1)
+        x, y = line.xy
+        plt.axis('equal')
+        # ax.plot(x, y, color='#999999')
+        ax.plot(x, y, color='#999999')
+        plt.show()
 
 
 class Vermiculus(object):
@@ -120,15 +121,23 @@ class Vermiculus(object):
         """
         cv = self.starting_vector
         cp = self.starting_point
-        points = [cp]
+        line_cords = [cp]
+        multi_line_cords = []
         for acid in self.dna:
-            cp, cv = next_point(self.proteins[acid],
-                                cv,
-                                self.unit_length,
-                                cp)
-            points.append(cp)
+            if acid is not 'B':
+                cp, cv = next_point(self.proteins[acid],
+                                    cv,
+                                    self.unit_length,
+                                    cp)
+                line_cords.append(cp)
+            else:
+                if len(line_cords) is not 0:
+                    multi_line_cords.append(line_cords)
+                line_cords = []
 
-        self.phenotype = points
+        if len(line_cords) is not 0:
+            multi_line_cords.append(line_cords)
+        self.phenotype = multi_line_cords
 
     def build_topology(self):
         """
@@ -138,7 +147,8 @@ class Vermiculus(object):
 
         """
         self._translate_dna()
-        self.topology = LineString(self.phenotype)
+        # self.topology = LineString(self.phenotype)
+        self.topology = MultiLineString(self.phenotype)
         self.topology_dilated = self.topology.buffer(self.unit_width)
         self.area = self.topology_dilated.area
 
@@ -242,9 +252,14 @@ def scan_population(num):
 def make_one_worm():
     worm = Vermiculus(1)
     worm.build_topology()
+
     draw_phenotype(worm.phenotype)
 
 
 if __name__ == "__main__":
     # scan_population(5000)
-    make_one_worm()
+    # make_one_worm()
+    worm = Vermiculus(1)
+    worm.build_topology()
+
+    draw_phenotype(worm.phenotype)
