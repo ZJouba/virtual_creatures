@@ -1,8 +1,5 @@
 
-ll = []
+letters = "abcd"
+charlist = [char for char in letters]
 
-ll.append(["A", "B"])
-
-a,b = ll.pop()
-
-len(sys.lines)
+print(np.random.choice(charlist))

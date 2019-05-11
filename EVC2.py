@@ -79,6 +79,65 @@ class L_System:
             self._update_product()
 
 
+class RandomBuild:
+    """
+    A string builder similar to an L-system, but without recursive replacement
+    """
+    def __init__(self,
+                 variables,
+                 constants,
+                 axioms):
+        """
+        Initialises a simple L-system
+        Parameters
+        ----------
+        variables : str
+            a string containing all of the letters that take part in the
+            recursion. These letters should also have associated rules.
+        constants : str or None
+            a string containing all the letters that do not take part in the
+            recursion. These letters will not have an associated rule
+        axioms : str
+            The initial character string
+        """
+        self.axioms = axioms
+        self.constants = constants
+        self.variables = variables
+        self.variable_char = [char for char in variables]
+        self.l_string = ""
+
+    def _update_product(self):
+        """
+        internal method for applying the recursive L-System rules. The
+        L-System l_string is updated
+        Returns
+        -------
+        None
+
+        """
+        if len(self.l_string) is not 0:
+            self.l_string = self.l_string + np.random.choice(self.variable_char)
+        else:
+            self.l_string = self.l_string + self.axioms
+
+    def recur_n(self, n):
+        """
+        iterate through the recursive L-system update n times.
+        Parameters
+        ----------
+        n : int
+            number of iterations of the L-System update
+
+        Returns
+        -------
+        None
+
+        """
+        self.l_string = self.axioms
+        for _ in range(n):
+            self._update_product()
+
+
 class BuilderBase:
     """
     WOrk needs to be done o convert the L-strings into a set of coordinates
@@ -381,11 +440,33 @@ class FractalPlant(L_System):
                            "F": "FF"})
 
 
+class Worm(RandomBuild, BuilderBase, Plotter):
+    """
+    Generate a binary tree L-system
+    Tests
+    -------
+    ,
+                 ,
+
+    """
+    def __init__(self):
+        RandomBuild.__init__(self,
+                             variables="F+-",
+                             constants="",
+                             axioms="F",)
+        BuilderBase.__init__(self,
+                             np.array([0, 0]),
+                             np.array([0, 1]),
+                             1.0,
+                             45)
+        Plotter.__init__(self)
+
 if __name__ == "__main__":
     # sys = DragonCurve()
     # sys = KochCurve()
-    sys = BinaryTree()
-    sys.recur_n(5)
+    # sys = BinaryTree()
+    sys = Worm()
+    sys.recur_n(200)
     sys.build_point_list()
     # sys.simple_plot()
     sys.multi_line_plot()
