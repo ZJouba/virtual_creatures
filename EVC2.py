@@ -7,6 +7,8 @@ from scipy.spatial.transform import Rotation
 
 """
 Looking at what we can do with L-systems, can I create a base class?
+
+https://en.wikipedia.org/wiki/L-system#Example_1:_Algae
 """
 
 
@@ -102,12 +104,18 @@ class BuilderBase:
         self.vector = vector
         self.length = length
         self.point_list = [point]
-        self.mapping = {"F": self.move_forward,
+        self.mapping = {"~": self.end_of_string,
+                        "F": self.move_forward,
                         "+": self.rotate_right,
-                        "-": self.rotate_left}
+                        "-": self.rotate_left,
+                        "1": self.move_forward,
+                        "0": self.move_forward,
+                        "[": self.push_to_buffer,
+                        "]": self.pop_from_buffer}
         self.active_chars = None
         self.control_chars = None
         self.buffer = []
+        self.lines = []
 
     def get_active_sequence(self):
         """
@@ -121,6 +129,7 @@ class BuilderBase:
         self.control_chars = ''.join(self.mapping.keys())
         self.active_chars = ''.join([x for x in self.l_string if x in
                                      self.control_chars])
+        self.active_chars = self.active_chars + "~"
 
     def build_point_list(self):
         """
@@ -174,6 +183,7 @@ class BuilderBase:
 
         """
         self.buffer.append([self.point, self.vector])
+        self.rotate_left()
 
     def pop_from_buffer(self):
         """
@@ -183,6 +193,19 @@ class BuilderBase:
 
         """
         self.point, self.vector = self.buffer.pop()
+        self.lines.append(self.point_list)
+        self.point_list = [self.point]
+        self.rotate_right()
+
+    def end_of_string(self):
+        """
+        I have a way to build up multiple lines, but the last on gets lost.
+        so I use this to append the last segment to the lines list.
+        Returns
+        -------
+
+        """
+        self.lines.append(self.point_list)
 
 
 class Plotter:
@@ -207,6 +230,20 @@ class Plotter:
         ax.plot(x, y, color='#999999')
         plt.show()
 
+    def multi_line_plot(self):
+        fig = plt.figure(1, figsize=(5, 5), dpi=180)
+        ax = fig.add_subplot(111)
+        line = MultiLineString(self.lines)
+
+        dilated = line.buffer(0.5)
+        patch1 = PolygonPatch(dilated, facecolor='#99ccff', edgecolor='#6699cc')
+        ax.add_patch(patch1)
+        for i in range(len(self.lines)):
+            x, y = line[i].xy
+            plt.axis('equal')
+            ax.plot(x, y, color='#999999')
+            plt.show()
+
 class Alga(L_System):
     """
     build a algea L-system
@@ -229,7 +266,7 @@ class Alga(L_System):
                            "B": "A"})
 
 
-class BinaryTree(L_System):
+class BinaryTree(L_System, BuilderBase, Plotter):
     """
     Generate a binary tree L-system
     Tests
@@ -245,6 +282,12 @@ class BinaryTree(L_System):
                           "0",
                           {"1": "11",
                            "0": "1[0]0"})
+        BuilderBase.__init__(self,
+                             np.array([0, 0]),
+                             np.array([0, 1]),
+                             1.0,
+                             45)
+        Plotter.__init__(self)
 
 
 class CantorSet(L_System):
@@ -340,9 +383,10 @@ class FractalPlant(L_System):
 
 if __name__ == "__main__":
     # sys = DragonCurve()
-    sys = KochCurve()
-    # sys = BinaryTree()
-    sys.recur_n(3)
+    # sys = KochCurve()
+    sys = BinaryTree()
+    sys.recur_n(5)
     sys.build_point_list()
-    sys.simple_plot()
+    # sys.simple_plot()
+    sys.multi_line_plot()
 
