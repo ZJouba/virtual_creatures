@@ -64,8 +64,9 @@ class L_System:
 
 
 class BuilderBase:
-    def __init__(self, point, vector, length):
+    def __init__(self, point, vector, length, angle):
         # self.l_string = l_string
+        self.angle = angle
         self.point = point
         self.vector = vector
         self.length = length
@@ -82,12 +83,12 @@ class BuilderBase:
         self.point_list.append(self.point)
 
     def rotate_left(self):
-        r = Rotation.from_euler('z', 90, degrees=True)
+        r = Rotation.from_euler('z', self.angle, degrees=True)
         vec = np.append(self.vector, [0])
         self.vector = r.apply(vec)[:2]
 
     def rotate_right(self):
-        r = Rotation.from_euler('z', -90, degrees=True)
+        r = Rotation.from_euler('z', -self.angle, degrees=True)
         vec = np.append(self.vector, [0])
         self.vector = r.apply(vec)[:2]
 
@@ -100,7 +101,6 @@ class BuilderBase:
         self.get_active_sequence()
         for letter in self.active_chars:
             self.mapping[letter]()
-        # return self.point_list
 
 
 class Plotter:
@@ -192,9 +192,10 @@ class KochCurve(L_System, BuilderBase, Plotter):
                           "F",
                           {"F": "F+F-F-F+F", })
         BuilderBase.__init__(self,
-                         np.array([0, 0]),
-                         np.array([1, 0]),
-                         1.0)
+                             np.array([0, 0]),
+                             np.array([1, 0]),
+                             1.0,
+                             90)
         Plotter.__init__(self)
 
 
@@ -227,9 +228,10 @@ class DragonCurve(L_System, BuilderBase, Plotter):
                           {"X": "X+YF+",
                            "Y": "-FX-Y"})
         BuilderBase.__init__(self,
-                         np.array([0, 0]),
-                         np.array([0, 1]),
-                         1.0)
+                             np.array([0, 0]),
+                             np.array([0, 1]),
+                             1.0,
+                             90)
         Plotter.__init__(self)
 
 
@@ -251,9 +253,9 @@ class FractalPlant(L_System):
 
 if __name__ == "__main__":
     # sys = DragonCurve()
-    # sys = KochCurve()
-    sys = BinaryTree()
+    sys = KochCurve()
+    # sys = BinaryTree()
     sys.recur_n(3)
-    # sys.build_point_list()
-    # sys.simple_plot()
+    sys.build_point_list()
+    sys.simple_plot()
 
