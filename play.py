@@ -1,19 +1,15 @@
 
 
-acids = ["A", "B", "C"]
-test = ''.join(np.random.choice(acids,) for _ in range(10))
+
+text = "abcasdfasdflj;saga;sdfijasdfh"
+wanted = "abc"
+
+short = "".join([x for x in text if x in wanted])
 
 
-point = []
-all_points = []
-for acid in test:
-    if acid is not "B":
-        point.append(acid)
-    else:
-        if len(point) is not 0:
-            all_points.append(point)
-        point = []
+temp = {"a": 1, "b": 2}
 
-if len(point) is not 0:
-    all_points.append(point)
-import shapely.geometry
+# control_chars = ''.join(sys.mapping.keys())
+print("".join([x for x in sys.l_string if x in sys.control_chars]))
+
+test = Plotter()

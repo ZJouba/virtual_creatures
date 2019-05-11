@@ -45,17 +45,15 @@ def draw_phenotype(phenotype):
     """
     fig = plt.figure(1, figsize=(5, 5), dpi=180)
     ax = fig.add_subplot(111)
-    for line in phenotype:
-        line = LineString(line)
+    line = LineString(phenotype)
 
-        dilated = line.buffer(0.5)
-        patch1 = PolygonPatch(dilated, facecolor='#99ccff', edgecolor='#6699cc')
-        ax.add_patch(patch1)
-        x, y = line.xy
-        plt.axis('equal')
-        # ax.plot(x, y, color='#999999')
-        ax.plot(x, y, color='#999999')
-        plt.show()
+    dilated = line.buffer(0.5)
+    patch1 = PolygonPatch(dilated, facecolor='#99ccff', edgecolor='#6699cc')
+    ax.add_patch(patch1)
+    x, y = line.xy
+    plt.axis('equal')
+    ax.plot(x, y, color='#999999')
+    plt.show()
 
 
 class Vermiculus(object):
@@ -85,9 +83,6 @@ class Vermiculus(object):
         self.dna_length = dna_length
         self.unit_length = unit_length
         self.unit_width = unit_width
-        # self.proteins = {"F": 0.0,
-        #                  "L": -1 * np.pi / 4,
-        #                  "R": np.pi / 4}
         self.proteins = {"F": 0.0,
                          "L": 45,
                          "R": -45}
@@ -122,22 +117,14 @@ class Vermiculus(object):
         cv = self.starting_vector
         cp = self.starting_point
         line_cords = [cp]
-        multi_line_cords = []
         for acid in self.dna:
-            if acid is not 'B':
-                cp, cv = next_point(self.proteins[acid],
-                                    cv,
-                                    self.unit_length,
-                                    cp)
-                line_cords.append(cp)
-            else:
-                if len(line_cords) is not 0:
-                    multi_line_cords.append(line_cords)
-                line_cords = []
+            cp, cv = next_point(self.proteins[acid],
+                                cv,
+                                self.unit_length,
+                                cp)
+            line_cords.append(cp)
 
-        if len(line_cords) is not 0:
-            multi_line_cords.append(line_cords)
-        self.phenotype = multi_line_cords
+        self.phenotype = line_cords
 
     def build_topology(self):
         """
@@ -147,13 +134,12 @@ class Vermiculus(object):
 
         """
         self._translate_dna()
-        # self.topology = LineString(self.phenotype)
-        self.topology = MultiLineString(self.phenotype)
+        self.topology = LineString(self.phenotype)
         self.topology_dilated = self.topology.buffer(self.unit_width)
         self.area = self.topology_dilated.area
 
 
-class Radix(Vermiculus):
+class Alga(Vermiculus):
     """
     Makes a root like structure
     """
@@ -181,14 +167,12 @@ class Radix(Vermiculus):
         self.dna_length = dna_length
         self.unit_length = unit_length
         self.unit_width = unit_width
-        # self.proteins = {"F": 0.0,
-        #                  "L": -1 * np.pi / 4,
-        #                  "R": np.pi / 4}
         self.proteins = {"F": 0.0,
                          "L": 45,
-                         "R": -45}
+                         "R": -45,
+                         "B": 0.0}
         self.amino_acids = list(self.proteins.keys())
-        self.amino_probabilities = [0.4, 0.3, 0.3]
+        self.amino_probabilities = [0.4, 0.3, 0.3, 0.0]
 
         self.phenotype = [self.starting_point]
         self.dna = self.transcribe_dna()
@@ -256,10 +240,14 @@ def make_one_worm():
     draw_phenotype(worm.phenotype)
 
 
+def make_one_alga():
+    duckweed = Alga(1)
+    duckweed.build_topology()
+
+    draw_phenotype(duckweed.phenotype)
+
+
 if __name__ == "__main__":
     # scan_population(5000)
     # make_one_worm()
-    worm = Vermiculus(1)
-    worm.build_topology()
-
-    draw_phenotype(worm.phenotype)
+    make_one_alga()
