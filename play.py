@@ -1,8 +1,6 @@
 
-def test():
-    print("rr")
+ll = []
 
+ll.append(["A", "B"])
 
-aa = {"A": test()}
-
-aa["A"]()
+a,b = ll.pop()

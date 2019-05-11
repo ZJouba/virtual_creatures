@@ -11,6 +11,10 @@ Looking at what we can do with L-systems, can I create a base class?
 
 
 class L_System:
+    """
+    a base class for an L-system. Contains methods for single and multiple
+    recursions
+    """
     def __init__(self,
                  variables,
                  constants,
@@ -20,10 +24,20 @@ class L_System:
         Initialises a simple L-system
         Parameters
         ----------
-        variables
-        constants
-        axioms
-        rules
+        variables : str
+            a string containing all of the letters that take part in the
+            recursion. These letters should also have associated rules.
+        constants : str or None
+            a string containing all the letters that do not take part in the
+            recursion. These letters will not have an associated rule
+        axioms : str
+            The initial character string
+        rules : dict
+            a dictionary containing the rules for recursion. This is a
+            dictionary of listing the letter replacement in the recursion.
+            eg.
+            {"A": "AB",
+            "B": "A"}
         """
         self.rules = rules
         self.axioms = axioms
@@ -64,8 +78,25 @@ class L_System:
 
 
 class BuilderBase:
+    """
+    WOrk needs to be done o convert the L-strings into a set of coordinates
+    or lines. This class is a helper class and presumes that it will be
+    inherited by a class that also inherites from the L-System class.
+    """
     def __init__(self, point, vector, length, angle):
-        # self.l_string = l_string
+        """
+
+        Parameters
+        ----------
+        point : array like
+            the starting point for the l-system
+        vector : array like
+            the initial direction for the system
+        length : float
+            the length of a segemnt
+        angle : float
+            the angle of deviation
+        """
         self.angle = angle
         self.point = point
         self.vector = vector
@@ -76,34 +107,90 @@ class BuilderBase:
                         "-": self.rotate_left}
         self.active_chars = None
         self.control_chars = None
-
-    def move_forward(self):
-        self.vector = self.length * (self.vector / np.linalg.norm(self.vector))
-        self.point = self.point + self.vector
-        self.point_list.append(self.point)
-
-    def rotate_left(self):
-        r = Rotation.from_euler('z', self.angle, degrees=True)
-        vec = np.append(self.vector, [0])
-        self.vector = r.apply(vec)[:2]
-
-    def rotate_right(self):
-        r = Rotation.from_euler('z', -self.angle, degrees=True)
-        vec = np.append(self.vector, [0])
-        self.vector = r.apply(vec)[:2]
+        self.buffer = []
 
     def get_active_sequence(self):
+        """
+        takes the l-string provided and strips out the characters that are
+        not associated with creating or actioning the parts. Essentially
+        taking the dna and defining the phenotype.
+        Returns
+        -------
+
+        """
         self.control_chars = ''.join(self.mapping.keys())
         self.active_chars = ''.join([x for x in self.l_string if x in
                                      self.control_chars])
 
     def build_point_list(self):
+        """
+        reads the l-string active componets and finds all of the coordinates.
+        Returns
+        -------
+
+        """
         self.get_active_sequence()
         for letter in self.active_chars:
             self.mapping[letter]()
 
+    def move_forward(self):
+        """
+        creates a new point along the current vector and appends it to the list
+        Returns
+        -------
+
+        """
+        self.vector = self.length * (self.vector / np.linalg.norm(self.vector))
+        self.point = self.point + self.vector
+        self.point_list.append(self.point)
+
+    def rotate_left(self):
+        """
+        rotates the current vector counter clockwise
+        Returns
+        -------
+
+        """
+        r = Rotation.from_euler('z', self.angle, degrees=True)
+        vec = np.append(self.vector, [0])
+        self.vector = r.apply(vec)[:2]
+
+    def rotate_right(self):
+        """
+        rotates the current vector clockwise
+        Returns
+        -------
+
+        """
+        r = Rotation.from_euler('z', -self.angle, degrees=True)
+        vec = np.append(self.vector, [0])
+        self.vector = r.apply(vec)[:2]
+
+    def push_to_buffer(self):
+        """
+        append the current point and vector to a list for later
+        Returns
+        -------
+
+        """
+        self.buffer.append([self.point, self.vector])
+
+    def pop_from_buffer(self):
+        """
+        append the current point and vector to a list for later
+        Returns
+        -------
+
+        """
+        self.point, self.vector = self.buffer.pop()
+
 
 class Plotter:
+    """
+    Adds some plotting tools for networks. This class is a helper class and
+    presumes that it will be inherited by a class that also inherites from the
+     L-System class.
+    """
     def __init__(self):
         pass
 
