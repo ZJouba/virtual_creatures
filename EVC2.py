@@ -318,10 +318,11 @@ class BuilderPlant(BuilderBase):
         -------
 
         """
+
+        if len(self.point_list) > 1:
+            self.lines.append(self.point_list)
         self.point, self.vector = self.buffer.pop(-1)
-        # if len(self.point_list) > 1:
-        #     self.lines.append(self.point_list)
-        #     self.point_list = [self.point]
+        self.point_list = [self.point]
         # self.rotate_right()
 
 
@@ -500,7 +501,7 @@ class FractalPlant(L_System, BuilderPlant, Plotter):
                               np.array([0, 0]),
                               np.array([0, 1]),
                               1.0,
-                              45)
+                              25)
         Plotter.__init__(self)
 
 
@@ -522,7 +523,7 @@ class Worm(RandomBuild, BuilderBase, Plotter):
                              np.array([0, 0]),
                              np.array([0, 1]),
                              1.0,
-                             45)
+                             25)
         Plotter.__init__(self)
 
 
@@ -544,7 +545,7 @@ class AL(RandomBuild, BuilderBase, Plotter):
                              np.array([0, 0]),
                              np.array([0, 1]),
                              1.0,
-                             45)
+                             25)
         Plotter.__init__(self)
 
 
@@ -555,7 +556,7 @@ if __name__ == "__main__":
     # sys = BinaryTree()
     # sys = Worm()
     sys = FractalPlant()
-    sys.recur_n(2)
+    sys.recur_n(5)
     sys.build_point_list()
     # sys.simple_plot()
     sys.multi_line_plot()
