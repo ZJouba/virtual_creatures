@@ -264,7 +264,65 @@ class BuilderBase:
         -------
 
         """
-        self.lines.append(self.point_list)
+        if len(self.point_list) > 1:
+            self.lines.append(self.point_list)
+
+
+class BuilderPlant(BuilderBase):
+    """
+    Augments the builder base and replaces some of the methods.
+    """
+    def __init__(self, point, vector, length, angle):
+        """
+
+        Parameters
+        ----------
+        point : array like
+            the starting point for the l-system
+        vector : array like
+            the initial direction for the system
+        length : float
+            the length of a segemnt
+        angle : float
+            the angle of deviation
+        """
+        BuilderBase.__init__(self,
+                             point,
+                             vector,
+                             length,
+                             angle)
+
+        self.mapping = {"~": self.end_of_string,
+                        "F": self.move_forward,
+                        "+": self.rotate_right,
+                        "-": self.rotate_left,
+                        "1": self.move_forward,
+                        "0": self.move_forward,
+                        "[": self.push_to_buffer,
+                        "]": self.pop_from_buffer}
+
+    def push_to_buffer(self):
+        """
+        append the current point and vector to a list for later
+        Returns
+        -------
+
+        """
+        self.buffer.append([self.point, self.vector])
+        # self.rotate_left()
+
+    def pop_from_buffer(self):
+        """
+        append the current point and vector to a list for later
+        Returns
+        -------
+
+        """
+        self.point, self.vector = self.buffer.pop(-1)
+        # if len(self.point_list) > 1:
+        #     self.lines.append(self.point_list)
+        #     self.point_list = [self.point]
+        # self.rotate_right()
 
 
 class Plotter:
@@ -425,7 +483,7 @@ class DragonCurve(L_System, BuilderBase, Plotter):
 
 
 
-class FractalPlant(L_System):
+class FractalPlant(L_System, BuilderPlant, Plotter):
     """
     Generate a Fractal Plant L-system
     Tests
@@ -438,6 +496,12 @@ class FractalPlant(L_System):
                           "X",
                           {"X": "F+[[X]-X]-F[-FX]+X",
                            "F": "FF"})
+        BuilderPlant.__init__(self,
+                              np.array([0, 0]),
+                              np.array([0, 1]),
+                              1.0,
+                              45)
+        Plotter.__init__(self)
 
 
 class Worm(RandomBuild, BuilderBase, Plotter):
@@ -461,12 +525,37 @@ class Worm(RandomBuild, BuilderBase, Plotter):
                              45)
         Plotter.__init__(self)
 
+
+class AL(RandomBuild, BuilderBase, Plotter):
+    """
+    Generate a binary tree L-system
+    Tests
+    -------
+    ,
+                 ,
+
+    """
+    def __init__(self):
+        RandomBuild.__init__(self,
+                             variables="F+-",
+                             constants="",
+                             axioms="F",)
+        BuilderBase.__init__(self,
+                             np.array([0, 0]),
+                             np.array([0, 1]),
+                             1.0,
+                             45)
+        Plotter.__init__(self)
+
+
+
 if __name__ == "__main__":
     # sys = DragonCurve()
     # sys = KochCurve()
     # sys = BinaryTree()
-    sys = Worm()
-    sys.recur_n(200)
+    # sys = Worm()
+    sys = FractalPlant()
+    sys.recur_n(2)
     sys.build_point_list()
     # sys.simple_plot()
     sys.multi_line_plot()
