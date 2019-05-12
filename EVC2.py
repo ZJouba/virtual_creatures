@@ -9,6 +9,31 @@ from scipy.spatial.transform import Rotation
 Looking at what we can do with L-systems, can I create a base class?
 
 https://en.wikipedia.org/wiki/L-system#Example_1:_Algae
+
+http://paulbourke.net/fractals/lsys/
+
+Symbols The following characters have a geometric interpretation.
+
+Character        Meaning
+   F	         Move forward by line length drawing a line
+   f	         Move forward by line length without drawing a line
+   +	         Turn left by turning angle
+   -	         Turn right by turning angle
+   |	         Reverse direction (ie: turn by 180 degrees)
+   [	         Push current drawing state onto stack
+   ]	         Pop current drawing state from the stack
+   #	         Increment the line width by line width increment
+   !	         Decrement the line width by line width increment
+   @	         Draw a dot with line width radius
+   {	         Open a polygon
+   }	         Close a polygon and fill it with fill colour
+   >	         Multiply the line length by the line length scale factor
+   <	         Divide the line length by the line length scale factor
+   &	         Swap the meaning of + and -
+   (	         Decrement turning angle by turning angle increment
+   )	         Increment turning angle by turning angle increment
+
+
 """
 
 
@@ -501,7 +526,7 @@ class FractalPlant(L_System, BuilderPlant, Plotter):
                               np.array([0, 0]),
                               np.array([0, 1]),
                               1.0,
-                              25)
+                              15)
         Plotter.__init__(self)
 
 
@@ -549,14 +574,164 @@ class AL(RandomBuild, BuilderBase, Plotter):
         Plotter.__init__(self)
 
 
+class ZeroL(L_System, BuilderBase, Plotter):
+    """
+    Generate a Dragon Curve L-system
+    Tests
+    -------
+
+    """
+    def __init__(self):
+        L_System.__init__(self,
+                          variables="F",
+                          constants="",
+                          axioms="F+F+F+F",
+                          rules={"F": "F+F-F-FF+F+F-F",})
+        BuilderBase.__init__(self,
+                             np.array([0, 0]),
+                             np.array([1, 0]),
+                             1.0,
+                             90)
+        Plotter.__init__(self)
+
+
+class Bricks(L_System, BuilderBase, Plotter):
+    """
+    Generate a Dragon Curve L-system
+    Tests
+    -------
+
+    """
+    def __init__(self):
+        L_System.__init__(self,
+                          variables="F",
+                          constants="",
+                          axioms="F+F+F+F",
+                          rules={"F": "FF+F-F+F+FF",})
+        BuilderBase.__init__(self,
+                             np.array([0, 0]),
+                             np.array([1, 0]),
+                             1.0,
+                             90)
+        Plotter.__init__(self)
+
+
+class Bush(L_System, BuilderPlant, Plotter):
+    """
+    Generate a Dragon Curve L-system
+    Tests
+    -------
+
+    """
+    def __init__(self):
+        L_System.__init__(self,
+                          variables="XY",
+                          constants="F+-[]",
+                          axioms="Y",
+                          rules={"X": "X[-FFF][+FFF]FX",
+                                 "Y": "YFX[+Y][-Y]", })
+        BuilderPlant.__init__(self,
+                             np.array([0, 0]),
+                             np.array([0, 1]),
+                             1.0,
+                             25.7)
+        Plotter.__init__(self)
+
+
+class Bush2(L_System, BuilderPlant, Plotter):
+    """
+    Generate a Dragon Curve L-system
+    Tests
+    -------
+
+    """
+
+    def __init__(self):
+        L_System.__init__(self,
+                          variables="F",
+                          constants="F+-[]",
+                          axioms="F",
+                          rules={"F": "FF+[+F-F-F]-[-F+F+F]", })
+        BuilderPlant.__init__(self,
+                              np.array([0, 0]),
+                              np.array([0, 1]),
+                              1.0,
+                              25.7)
+        Plotter.__init__(self)
+
+
+class Bush3(L_System, BuilderPlant, Plotter):
+    """
+    Generate a Dragon Curve L-system
+    Tests
+    -------
+
+    """
+
+    def __init__(self):
+        L_System.__init__(self,
+                          variables="VWXYZ",
+                          constants="F+-[]",
+                          axioms="VZFFF",
+                          rules={"V": "[+++W][---W]YV",
+                                 "W": "+X[-W]Z",
+                                 "X": "-W[+X]Z",
+                                 "Y": "YZ",
+                                 "Z": "[-FFF][+FFF]F",})
+        BuilderPlant.__init__(self,
+                              np.array([0, 0]),
+                              np.array([0, 1]),
+                              1.0,
+                              20)
+        Plotter.__init__(self)
+
+
+class Bush4(L_System, BuilderPlant, Plotter):
+    """
+    Generate a Dragon Curve L-system
+    Tests
+    -------
+
+    """
+
+    def __init__(self):
+        L_System.__init__(self,
+                          variables="X",
+                          constants="F+-[]",
+                          axioms="FX",
+                          rules={"X": "[-FX]+FX",})
+        BuilderPlant.__init__(self,
+                              np.array([0, 0]),
+                              np.array([0, 1]),
+                              1.0,
+                              40)
+        Plotter.__init__(self)
+
 
 if __name__ == "__main__":
     # sys = DragonCurve()
+    # sys.recur_n(10)
     # sys = KochCurve()
+    # sys.recur_n(3)
     # sys = BinaryTree()
+    # sys.recur_n(3)
     # sys = Worm()
-    sys = FractalPlant()
-    sys.recur_n(5)
+    # sys.recur_n(100)
+    # sys = FractalPlant()
+    # sys.recur_n(4)
+    # sys = ZeroL()
+    # sys.recur_n(2)
+    # sys = Bricks()
+    # sys.recur_n(3)
+    # sys = Bush()
+    # sys.recur_n(5)
+    # sys = Bush2()
+    # sys.recur_n(4)
+    # sys = Bush3()
+    # sys.recur_n(8)
+    sys = Bush4()
+    sys.recur_n(9)
+
     sys.build_point_list()
     # sys.simple_plot()
     sys.multi_line_plot()
