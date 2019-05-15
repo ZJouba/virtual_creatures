@@ -104,7 +104,7 @@ class LSystem:
             self._update_product()
 
 
-class LSystemStochastic:
+class LSystemStochastic(LSystem):
     """
     a base class for an L-system. Contains methods for single and multiple
     recursions. With probabilities.
@@ -133,11 +133,11 @@ class LSystemStochastic:
             {"A": ["AB", "BA"],
             "B": ["A", "B"]}
         """
-        self.rules = rules
-        self.axioms = axioms
-        self.constants = constants
-        self.variables = variables
-        self.l_string = ""
+        LSystem.__init__(self,
+                         variables=variables,
+                         constants=constants,
+                         axioms=axioms,
+                         rules=rules)
 
     def _update_product(self):
         """
@@ -149,86 +149,18 @@ class LSystemStochastic:
 
         """
         if len(self.l_string) is not 0:
-            self.l_string = ''.join([np.random.choice(self.rules.get(c, [c]))
-                                     for c in self.l_string])
+            self.l_string = ''.join([self.next_char(c) for c in self.l_string])
         else:
             self.l_string = self.l_string + self.axioms
 
-    def recur_n(self, n):
-        """
-        iterate through the recursive L-system update n times.
-        Parameters
-        ----------
-        n : int
-            number of iterations of the L-System update
-
-        Returns
-        -------
-        None
-
-        """
-        self.l_string = self.axioms
-        for _ in range(n):
-            self._update_product()
-
-
-# class RandomBuild:
-#     """
-#     A string builder similar to an L-system, but without recursive replacement
-#     """
-#     def __init__(self,
-#                  variables,
-#                  constants,
-#                  axioms):
-#         """
-#         Initialises a simple L-system
-#         Parameters
-#         ----------
-#         variables : str
-#             a string containing all of the letters that take part in the
-#             recursion. These letters should also have associated rules.
-#         constants : str or None
-#             a string containing all the letters that do not take part in the
-#             recursion. These letters will not have an associated rule
-#         axioms : str
-#             The initial character string
-#         """
-#         self.axioms = axioms
-#         self.constants = constants
-#         self.variables = variables
-#         self.variable_char = [char for char in variables]
-#         self.l_string = ""
-#
-#     def _update_product(self):
-#         """
-#         internal method for applying the recursive L-System rules. The
-#         L-System l_string is updated
-#         Returns
-#         -------
-#         None
-#
-#         """
-#         if len(self.l_string) is not 0:
-#             self.l_string = self.l_string + np.random.choice(self.variable_char)
-#         else:
-#             self.l_string = self.l_string + self.axioms
-#
-#     def recur_n(self, n):
-#         """
-#         iterate through the recursive L-system update n times.
-#         Parameters
-#         ----------
-#         n : int
-#             number of iterations of the L-System update
-#
-#         Returns
-#         -------
-#         None
-#
-#         """
-#         self.l_string = self.axioms
-#         for _ in range(n):
-#             self._update_product()
+    def next_char(self, c):
+        rule = self.rules.get(c, c)
+        if len(rule) > 1:
+            return np.random.choice(self.rules.get(c, ["Other"])["options"],
+                                    p=self.rules.get(c, ["Other"])[
+                                        "probabilities"])
+        else:
+            return rule
 
 
 class BuilderBase:
@@ -237,7 +169,12 @@ class BuilderBase:
     or coords. This class is a helper class and presumes that it will be
     inherited by a class that also inherites from the L-System class.
     """
-    def __init__(self, lstring, point, vector, length, angle,
+    def __init__(self,
+                 lstring,
+                 point,
+                 vector,
+                 length,
+                 angle,
                  lenght_scale_factor=1,
                  turning_angle_inc=0):
         """

@@ -178,7 +178,8 @@ class Worm(LSystemStochastic, BuilderBase, Plotter):
                                    variables="X",
                                    constants="F+-",
                                    axioms="FX",
-                                   rules={"X": ["+FX", "-FX"]})
+                                   rules={"X": {"options": ["+FX", "-FX"],
+                                                "probabilities": [0.5, 0.5]}})
         self.recur_n(n)
         BuilderBase.__init__(self,
                              self.l_string,
