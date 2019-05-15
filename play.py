@@ -1,23 +1,22 @@
-import numpy as np
-
-rules = {"A": {"options": ["AB", "BA"], "probabilities": [0.7, 0.3]},
-         "B": {"options": ["A", "B"], "probabilities": [0.5, 0.5]}}
-
-lstring = "A"
-
-lstring = ''.join([np.random.choice(rules.get(c, [c]))
-                                     for c in lstring])
+from CreatureTools import *
+from Creatures import *
+from tqdm import tqdm
 
 
+def get_individual(gram_length):
+    sys = Worm(gram_length)
+    sys.build_point_list()
+    sys.expose_to_environment()
+    return sys.creature_fitness, sys.l_string
 
-c = "A"
-rules.get(c, ["Other"])["options"]
-rules.get(c, ["Other"])["probabilities"]
+def scan_population(num_individuals, gram_length):
+    fitness = []
+    string = []
+    for _ in tqdm(range(num_individuals)):
+        f, s = get_individual(gram_length)
+        fitness.append(f)
+        string.append(s)
+    plt.hist(fitness, bins=50)
 
-np.random.choice(rules.get(c, ["Other"])["options"],
-                 p=rules.get(c, ["Other"])["probabilities"])
 
-np.random.ch
-
-["+FX", "-FX"]
-len(rules.get("F", ["Other"]))
+scan_population(1000, 100)

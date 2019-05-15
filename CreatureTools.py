@@ -176,7 +176,8 @@ class BuilderBase:
                  length,
                  angle,
                  lenght_scale_factor=1,
-                 turning_angle_inc=0):
+                 turning_angle_inc=0,
+                 buffer_diameter=0.5):
         """
 
         Parameters
@@ -190,6 +191,7 @@ class BuilderBase:
         angle : float
             the angle of deviation
         """
+        self.buffer_diameter = buffer_diameter
         self.lstring = lstring
         self.angle = angle
         self.point = point
@@ -447,7 +449,7 @@ class Plotter:
         ax = fig.add_subplot(111)
         line = LineString(self.coords)
 
-        dilated = line.buffer(0.5)
+        dilated = line.buffer(self.buffer_diameter)
         patch1 = PolygonPatch(dilated, facecolor='#99ccff', edgecolor='#6699cc')
         ax.add_patch(patch1)
         x, y = line.xy
@@ -460,7 +462,7 @@ class Plotter:
         ax = fig.add_subplot(111)
         line = MultiLineString(self.coords)
 
-        dilated = line.buffer(0.5)
+        dilated = line.buffer(self.buffer_diameter)
         patch1 = PolygonPatch(dilated, facecolor='#99ccff', edgecolor='#6699cc')
         ax.add_patch(patch1)
         for i in range(len(self.coords)):
@@ -478,4 +480,17 @@ class Environment:
     creature so that I can calculate their efficiency
     """
     def __init__(self):
-        pass
+        self.creature = None
+        self.creature_feed_zone = None
+        self.creature_length = None
+        self.creature_area = None
+        self.creature_fitness = None
+
+    def expose_to_environment(self):
+        self.creature = MultiLineString(self.coords)
+        self.creature_length = self.creature.length
+        self.creature_feed_zone = self.creature.buffer(self.buffer_diameter)
+        self.creature_area = self.creature_feed_zone.area
+        self.creature_fitness = self.creature_area
+
+

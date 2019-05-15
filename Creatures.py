@@ -164,32 +164,6 @@ class FractalPlant(LSystem, BuilderBase, Plotter):
         Plotter.__init__(self)
 
 
-class Worm(LSystemStochastic, BuilderBase, Plotter):
-    """
-    Generate a Worm L-system
-    Tests
-    -------
-    ,
-                 ,
-
-    """
-    def __init__(self, n):
-        LSystemStochastic.__init__(self,
-                                   variables="X",
-                                   constants="F+-",
-                                   axioms="FX",
-                                   rules={"X": {"options": ["+FX", "-FX"],
-                                                "probabilities": [0.5, 0.5]}})
-        self.recur_n(n)
-        BuilderBase.__init__(self,
-                             self.l_string,
-                             np.array([0, 0]),
-                             np.array([0, 1]),
-                             1.0,
-                             25)
-        Plotter.__init__(self)
-
-
 class ZeroL(LSystem, BuilderBase, Plotter):
     """
     Generate a Dragon Curve L-system
@@ -365,11 +339,37 @@ class Leaf(LSystem, BuilderBase, Plotter):
         Plotter.__init__(self)
 
 
+class Worm(LSystemStochastic, BuilderBase, Plotter, Environment):
+    """
+    Generate a Worm L-system
+    Tests
+    -------
+
+
+    """
+    def __init__(self, n):
+        LSystemStochastic.__init__(self,
+                                   variables="X",
+                                   constants="F+-",
+                                   axioms="FX",
+                                   rules={"X": {"options": ["+FX", "-FX"],
+                                                "probabilities": [0.5, 0.5]}})
+        self.recur_n(n)
+        BuilderBase.__init__(self,
+                             self.l_string,
+                             np.array([0, 0]),
+                             np.array([0, 1]),
+                             1.0,
+                             25)
+        Plotter.__init__(self)
+        Environment.__init__(self)
+
+
 if __name__ == "__main__":
     # sys = DragonCurve(10)
     # sys = KochCurve(3)
     # sys = BinaryTree(4)
-    sys = Worm(100)
+    sys = Worm(1000)
     # sys = FractalPlant(4)
     # sys = ZeroL(2)
     # sys = Bricks(3)
@@ -380,6 +380,7 @@ if __name__ == "__main__":
     # sys = Leaf(9)
 
     sys.build_point_list()
+    sys.expose_to_environment()
     # sys.simple_plot()
     sys.multi_line_plot()
 
