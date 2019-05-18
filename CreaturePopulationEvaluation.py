@@ -5,9 +5,11 @@ from multiprocessing import Pool
 
 import time
 
+import pandas as pd
+
 
 def get_individual(gram_length):
-    params = {"num_char": 1000,
+    params = {"num_char": 100,
               "variables": "X",
               "constants": "F+-",
               "axioms": "FX",
@@ -20,7 +22,8 @@ def get_individual(gram_length):
     sys = Worm(params)
     sys.build_point_list()
     sys.expose_to_environment()
-    return sys.creature_fitness, sys.l_string
+    return sys
+    # return sys.creature_fitness, sys.l_string
 
 
 def scan_population(num_individuals, gram_length, pool_size=8):
@@ -31,13 +34,18 @@ def scan_population(num_individuals, gram_length, pool_size=8):
                            total=num_individuals))
     end = time.time()
     print(end - start)
-    fitness, phenotypes = zip(*results)
-    plt.hist(fitness, bins=50)
-    plt.show()
-    return fitness, phenotypes
+    # fitness, phenotypes = zip(*results)
+    # plt.hist(fitness, bins=50)
+    # plt.show()
+    return results
+
+
+def build_df(res):
+    df = pd.DataFrame(zip(res.l_string,
+                          red.creature_fitness))
+    return df
 
 
 if __name__ == '__main__':
-    population = 10000
-    size = 50
-    fitness, strin = scan_population(population, size)
+    population = 1000
+    res = scan_population(population, size)
