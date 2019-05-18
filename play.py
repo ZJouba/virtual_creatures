@@ -1,22 +1,25 @@
-from CreatureTools import *
-from Creatures import *
-from tqdm import tqdm
+import pandas as pd
+
+df = pd.DataFrame(zip(fitness, strin))
+
+import numpy as np
+from scipy.optimize import minimize
+
+def rosen(x):
+    """The Rosenbrock function"""
+    return sum(100.0*(x[1:]-x[:-1]**2.0)**2.0 + (1-x[:-1])**2.0)
+
+x0 = np.array([1.3, 0.7, 0.8, 1.9, 1.2])
+res = minimize(rosen, x0, method='nelder-mead',
+               options={'xtol': 1e-8, 'disp': True})
 
 
-def get_individual(gram_length):
-    sys = Worm(gram_length)
-    sys.build_point_list()
-    sys.expose_to_environment()
-    return sys.creature_fitness, sys.l_string
-
-def scan_population(num_individuals, gram_length):
-    fitness = []
-    string = []
-    for _ in tqdm(range(num_individuals)):
-        f, s = get_individual(gram_length)
-        fitness.append(f)
-        string.append(s)
-    plt.hist(fitness, bins=50)
 
 
-scan_population(1000, 100)
+point,
+                 vector,
+                 length,
+                 angle,
+                 lenght_scale_factor=1,
+                 turning_angle_inc=0,
+                 buffer_diameter=0.5

@@ -347,29 +347,31 @@ class Worm(LSystemStochastic, BuilderBase, Plotter, Environment):
 
 
     """
-    def __init__(self, n):
+    def __init__(self, params):
         LSystemStochastic.__init__(self,
-                                   variables="X",
-                                   constants="F+-",
-                                   axioms="FX",
-                                   rules={"X": {"options": ["+FX", "-FX"],
-                                                "probabilities": [0.5, 0.5]}})
-        self.recur_n(n)
+                                   variables=params.get("variables"),
+                                   constants=params.get("constants"),
+                                   axioms=params.get("axioms"),
+                                   rules=params.get("rules"))
+        self.recur_n(params.get("num_char"))
         BuilderBase.__init__(self,
-                             self.l_string,
-                             np.array([0, 0]),
-                             np.array([0, 1]),
-                             1.0,
-                             25)
-        Plotter.__init__(self)
+                             lstring=self.l_string,
+                             point=params.get("point"),
+                             vector=params.get("vector"),
+                             length=params.get("length"),
+                             angle=params.get("angle"))
         Environment.__init__(self)
+        Plotter.__init__(self)
+
+    def get_params(self):
+        pass
 
 
 if __name__ == "__main__":
     # sys = DragonCurve(10)
     # sys = KochCurve(3)
     # sys = BinaryTree(4)
-    sys = Worm(1000)
+    # sys = Worm(1000)
     # sys = FractalPlant(4)
     # sys = ZeroL(2)
     # sys = Bricks(3)
@@ -378,6 +380,19 @@ if __name__ == "__main__":
     # sys = Bush3(8)
     # sys = Bush4(5)
     # sys = Leaf(9)
+
+    params = {"num_char": 1000,
+              "variables": "X",
+              "constants": "F+-",
+              "axioms": "FX",
+              "rules": {"X": {"options": ["+FX", "-FX"],
+                              "probabilities": [0.5, 0.5]}},
+              "point": np.array([0, 0]),
+              "vector": np.array([0, 1]),
+              "length": 1.0,
+              "angle": 25}
+
+    sys = Worm(params)
 
     sys.build_point_list()
     sys.expose_to_environment()
