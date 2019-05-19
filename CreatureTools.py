@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from shapely.geometry import LineString, MultiLineString
+from shapely.geometry import LineString, MultiLineString, Point
 from descartes.patch import PolygonPatch
 from scipy.spatial.transform import Rotation
 
@@ -445,6 +445,12 @@ class Plotter:
         pass
 
     def simple_plot(self):
+        """
+        A plotting tool for a single line
+        Returns
+        -------
+
+        """
         fig = plt.figure(1, figsize=(5, 5), dpi=180)
         ax = fig.add_subplot(111)
         line = LineString(self.coords)
@@ -458,6 +464,12 @@ class Plotter:
         plt.show()
 
     def multi_line_plot(self):
+        """
+        a plotting tool for branching creatures
+        Returns
+        -------
+
+        """
         fig = plt.figure(1, figsize=(5, 5), dpi=180)
         ax = fig.add_subplot(111)
         line = MultiLineString(self.coords)
@@ -465,6 +477,30 @@ class Plotter:
         dilated = line.buffer(self.buffer_diameter)
         patch1 = PolygonPatch(dilated, facecolor='#99ccff', edgecolor='#6699cc')
         ax.add_patch(patch1)
+        for i in range(len(self.coords)):
+            x, y = line[i].xy
+            plt.axis('equal')
+            ax.plot(x, y, color='#999999')
+            plt.show()
+
+    def plot_with_feed_zones(self):
+        """
+        a plotting tool for branching creatures
+        Returns
+        -------
+
+        """
+        fig = plt.figure(1, figsize=(5, 5), dpi=180)
+        ax = fig.add_subplot(111)
+        line = MultiLineString(self.coords)
+
+        patches = [PolygonPatch(circ) for circ in self.feed_zones]
+        for patch in patches:
+            ax.add_patch(patch)
+        dilated = line.buffer(self.buffer_diameter)
+        patch1 = PolygonPatch(dilated, facecolor='#99ccff', edgecolor='#6699cc')
+        ax.add_patch(patch1)
+
         for i in range(len(self.coords)):
             x, y = line[i].xy
             plt.axis('equal')
@@ -480,17 +516,49 @@ class Environment:
     creature so that I can calculate their efficiency
     """
     def __init__(self):
+        """
+        initialise the environment
+        """
         self.creature = None
         self.creature_feed_zone = None
         self.creature_length = None
         self.creature_area = None
         self.creature_fitness = None
+        self.feed_zones = []
+
+    def place_feed_zones(self, feed_zones):
+        """
+        place some objectives in the environment. For a start we will simple
+        place selected regions of rewards rather than simply using the size
+        to determine fitness.
+        Parameters
+        ----------
+        feed_zones : list of tuples
+            a list of thrupples containing the x, y positions for the food
+            source. the final value in the thrupple is the radius of the feed
+            zone
+
+        Returns
+        -------
+
+        """
+        self.feed_zones = [Point(zone[0], zone[1]).buffer(zone[2]) for zone in
+                           feed_zones]
+
+    def get_fitness(self):
+        """
+
+        Returns
+        -------
+
+        """
+        self.creature_fitness = self.creature_feed_zone.intersection(self.feed_zones)
 
     def expose_to_environment(self):
         self.creature = MultiLineString(self.coords)
         self.creature_length = self.creature.length
         self.creature_feed_zone = self.creature.buffer(self.buffer_diameter)
         self.creature_area = self.creature_feed_zone.area
-        self.creature_fitness = self.creature_area
+        self.get_fitness()
 
 

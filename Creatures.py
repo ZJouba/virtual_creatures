@@ -396,6 +396,9 @@ if __name__ == "__main__":
 
     sys.build_point_list()
     sys.expose_to_environment()
+    feed_zones = [(0, 0, 3), (10, 0, 3), (0, 10, 3)]
+    sys.place_feed_zones(feed_zones)
     # sys.simple_plot()
-    sys.multi_line_plot()
+    # sys.multi_line_plot()
+    sys.plot_with_feed_zones()
 
