@@ -5,6 +5,7 @@ import multiprocessing as mp
 import os
 import pandas as pd
 from datetime import datetime
+from scipy.interpolate import interp1d
 
 
 def genGen():
@@ -61,42 +62,57 @@ def genGen():
 
 
 if __name__ == "__main__":
-    iter = 1000
-    pool = mp.Pool()
+    timings = []
+    iterations = []
+    for i in [500, 1000, 1500, 2000, 2500, 5000, 10000]:
+        start = datetime.utcnow()
+        iter = i
+        pool = mp.Pool()
 
-    pbar = tqdm(total=iter)
-    population = [[
-        'L-string',
-        'Coordinates',
-        'Area',
-        'Bounding Coordinates',
-        '% of F',
-        '% of +',
-        '% of -',
-        'Longest F sequence',
-        'Longest + sequence',
-        'Longest - sequence',
-        'Average chars between Fs',
-        'Average chars between +s',
-        'Average chars between -s'
-    ]]
+        pbar = tqdm(total=iter)
+        population = [[
+            'L-string',
+            'Coordinates',
+            'Area',
+            'Bounding Coordinates',
+            '% of F',
+            '% of +',
+            '% of -',
+            'Longest F sequence',
+            'Longest + sequence',
+            'Longest - sequence',
+            'Average chars between Fs',
+            'Average chars between +s',
+            'Average chars between -s'
+        ]]
 
-    def update(*a):
-        pbar.update()
+        def update(*a):
+            pbar.update()
 
-    for i in range(pbar.total):
-        results = pool.apply_async(genGen, callback=update)
-        population.append(results.get())
+        for i in range(pbar.total):
+            results = pool.apply_async(genGen, callback=update)
+            population.append(results.get())
 
-    pool.close()
-    pool.join()
-    pbar.close()
+        pool.close()
+        pool.join()
+        pbar.close()
 
-    population = pd.DataFrame(population[1:], columns=population[0])
+        population = pd.DataFrame(population[1:], columns=population[0])
 
-    curr_dir = os.path.dirname(__file__)
+        curr_dir = os.path.dirname(__file__)
 
-    now = datetime.utcnow().strftime('%H.%M-%d.%m.%y')
-    file_name = os.path.join(curr_dir, 'monte_carlo_' + now + '_.csv')
+        now = datetime.utcnow().strftime('%H.%M-%d.%m.%y')
+        file_name = os.path.join(curr_dir, 'monte_carlo_' + now + '_.csv')
 
-    population.to_csv(file_name, index=None, header=True)
+        population.to_csv(file_name, index=None, header=True,
+                          chunksize=10000, compression='zip')
+
+        end = datetime.utcnow()
+
+        time = end-start
+
+        iterations.append(iter)
+        timings.append(time.total_seconds())
+
+    poly = interp1d(iterations, timings, fill_value="extrapolate")
+    print('1e7 samples will take {} hours'.format(poly(10000000)/3600))
