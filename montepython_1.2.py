@@ -1,4 +1,4 @@
-from CreatureTools import Creature
+from CreatureTools_n import Creature
 import numpy as np
 from tqdm import tqdm
 import multiprocessing as mp
