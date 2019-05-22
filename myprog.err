@@ -1,18 +1,6 @@
 Traceback (most recent call last):
   File "montepython_1.2.py", line 1, in <module>
-    from CreatureTools import Creature
-  File "/home/22115536/CreatureTools.py", line 2, in <module>
-    import matplotlib.pyplot as plt
-  File "/usr/lib64/python2.6/site-packages/matplotlib/pyplot.py", line 78, in <module>
-    new_figure_manager, draw_if_interactive, show = pylab_setup()
-  File "/usr/lib64/python2.6/site-packages/matplotlib/backends/__init__.py", line 25, in pylab_setup
-    globals(),locals(),[backend_name])
-  File "/usr/lib64/python2.6/site-packages/matplotlib/backends/backend_gtkagg.py", line 10, in <module>
-    from matplotlib.backends.backend_gtk import gtk, FigureManagerGTK, FigureCanvasGTK,\
-  File "/usr/lib64/python2.6/site-packages/matplotlib/backends/backend_gtk.py", line 8, in <module>
-    import gtk; gdk = gtk.gdk
-  File "/usr/lib64/python2.6/site-packages/gtk-2.0/gtk/__init__.py", line 64, in <module>
-    _init()
-  File "/usr/lib64/python2.6/site-packages/gtk-2.0/gtk/__init__.py", line 52, in _init
-    _gtk.init_check()
-RuntimeError: could not open display
+    from CreatureTools_n import Creature
+  File "/home/22115536/CreatureTools_n.py", line 2, in <module>
+    from shapely.geometry import LineString
+ImportError: No module named shapely.geometry
