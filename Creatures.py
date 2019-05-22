@@ -307,7 +307,7 @@ class Bush4(LSystem, BuilderBase, Plotter):
                              np.array([0, 1]),
                              1.0,
                              40,
-                             lenght_scale_factor=0.5)
+                             len_scale_factor=0.5)
         Plotter.__init__(self)
 
 
@@ -335,7 +335,7 @@ class Leaf(LSystem, BuilderBase, Plotter):
                              np.array([0, 1]),
                              1.0,
                              45,
-                             lenght_scale_factor=1.3)
+                             len_scale_factor=1.3)
         Plotter.__init__(self)
 
 
@@ -352,19 +352,27 @@ class Worm(LSystemStochastic, BuilderBase, Plotter, Environment):
                                    variables=params.get("variables"),
                                    constants=params.get("constants"),
                                    axioms=params.get("axioms"),
-                                   rules=params.get("rules"))
-        self.recur_n(params.get("num_char"))
+                                   rules=params.get("rules"),
+                                   num_iterations=params.get("num_char"))
+        # self.l_string = self.generate_new(params.get("num_char"))
+        # self.recur_n(params.get("num_char"))
         BuilderBase.__init__(self,
-                             lstring=self.l_string,
                              point=params.get("point"),
                              vector=params.get("vector"),
                              length=params.get("length"),
-                             angle=params.get("angle"))
-        Environment.__init__(self)
-        Plotter.__init__(self)
+                             angle=params.get("angle"),
+                             len_scale_factor=params.get("len_scale_factor"),
+                             angle_inc=params.get("angle_inc"))
+        Environment.__init__(self,
+                             feed_radius=params.get("feed_radius"))
+        Plotter.__init__(self,
+                         feed_radius=params.get("feed_radius"))
 
-    def get_params(self):
-        pass
+    def get_params(self, _):
+        gram = self.generate_new()
+        points = self.build_point_list(gram)
+        creature_length, creature_feed_zone, fitness = self.expose_to_environment(points)
+        return [fitness, points, creature_length, creature_feed_zone, gram]
 
 
 if __name__ == "__main__":
@@ -390,14 +398,15 @@ if __name__ == "__main__":
               "point": np.array([0, 0]),
               "vector": np.array([0, 1]),
               "length": 1.0,
-              "angle": 25}
+              "angle": 25,
+              "feed_radius": 0.5,
+              "len_scale_factor": 1,
+              "angle_inc": 0}
 
     sys = Worm(params)
-    sys.build_point_list()
-    sys.expose_to_environment()
-    feed_zones = [(0, 0, 3), (10, 0, 3), (0, 10, 3)]
-    sys.place_feed_zones(feed_zones)
-    # sys.simple_plot()
-    # sys.multi_line_plot()
-    sys.plot_with_feed_zones()
+    worm1 = sys.get_params()
+    worm2 = sys.get_params()
+
+    sys.multi_line_plot(worm1[1])
+    sys.multi_line_plot(worm2[1])
 

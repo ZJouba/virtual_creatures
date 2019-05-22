@@ -14,8 +14,8 @@
 
 # fig = plt.figure(1, figsize=(5, 5), dpi=180)
 # ax = fig.add_subplot(111)
-# circ = Point(1,1).buffer(1)
-# circ2 = Point(2,2).buffer(1)
+# circ = Point(1,1).stack(1)
+# circ2 = Point(2,2).stack(1)
 #
 # inter = circ.intersection(circ2)
 #
@@ -34,7 +34,7 @@
 # fig = plt.figure(1, figsize=(5, 5), dpi=180)
 # ax = fig.add_subplot(111)
 # feed_zones = [(0, 0, 0.5), (1, 1, 0.5), (2, 2, 0.5)]
-# circs = [Point(zone[0], zone[1]).buffer(zone[2]) for zone in feed_zones]
+# circs = [Point(zone[0], zone[1]).stack(zone[2]) for zone in feed_zones]
 #
 # patches = [PolygonPatch(circ) for circ in circs]
 # for patch in patches:
@@ -69,5 +69,5 @@ end = time.time()
 print("Elapsed (after compilation) = %s" % (end - start))
 
 
-
+df = pd.DataFrame(res)
 

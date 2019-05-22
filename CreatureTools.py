@@ -38,18 +38,24 @@ Character        Meaning
 
 class LSystem:
     """
-    a base class for an L-system. Contains methods for single and multiple
-    recursions
+    A builder for an L-system. Generates and returns l_grams for a given set
+    of rules.
+    Methods
+    --------
+
     """
     def __init__(self,
                  variables,
                  constants,
                  axioms,
-                 rules):
+                 rules,
+                 num_iterations):
         """
         Initialises a simple L-system
         Parameters
         ----------
+        num_iterations : int
+            number of iterations on the L-sytem
         variables : str
             a string containing all of the letters that take part in the
             recursion. These letters should also have associated rules.
@@ -65,43 +71,49 @@ class LSystem:
             {"A": "AB",
             "B": "A"}
         """
+        self.num_iterations = num_iterations
         self.rules = rules
         self.axioms = axioms
         self.constants = constants
         self.variables = variables
-        self.l_string = ""
 
-    def _update_product(self):
+    def _update_l_string(self, l_string):
         """
-        internal method for applying the recursive L-System rules. The
-        L-System l_string is updated
-        Returns
-        -------
-        None
-
-        """
-        if len(self.l_string) is not 0:
-            self.l_string = "".join([self.rules.get(c, c)
-                                     for c in self.l_string])
-        else:
-            self.l_string = self.l_string + self.axioms
-
-    def recur_n(self, n):
-        """
-        iterate through the recursive L-system update n times.
+        Apply the recursive L-system rules to the current gram
         Parameters
         ----------
-        n : int
-            number of iterations of the L-System update
+        l_string : str
+            the imput
+        Returns
+        -------
+        l_string : str
+            an updated L_string
+        """
+        if len(l_string) is not 0:
+            l_string = "".join([self.rules.get(c, c) for c in l_string])
+        else:
+            l_string = l_string + self.axioms
+
+        return l_string
+
+    def generate_new(self):
+        """
+        Iterate through the recursive L-system num_iterations times and
+        return an updated gram.
+        Parameters
+        ----------
 
         Returns
         -------
-        None
+        l_string : str
+            L_string gram iterated num_iterations times
 
         """
-        self.l_string = self.axioms
-        for _ in range(n):
-            self._update_product()
+        l_string = self.axioms
+        for _ in range(self.num_iterations):
+            l_string = self._update_l_string(l_string)
+
+        return l_string
 
 
 class LSystemStochastic(LSystem):
@@ -113,11 +125,14 @@ class LSystemStochastic(LSystem):
                  variables,
                  constants,
                  axioms,
-                 rules):
+                 rules,
+                 num_iterations):
         """
         Initialises a simple L-system
         Parameters
         ----------
+        num_iterations : int
+            the number of iterations on the L-system
         variables : str
             a string containing all of the letters that take part in the
             recursion. These letters should also have associated rules.
@@ -137,21 +152,23 @@ class LSystemStochastic(LSystem):
                          variables=variables,
                          constants=constants,
                          axioms=axioms,
-                         rules=rules)
+                         rules=rules,
+                         num_iterations=num_iterations)
 
-    def _update_product(self):
+    def _update_l_string(self, l_string):
         """
-        internal method for applying the recursive L-System rules. The
-        L-System l_string is updated
+        Apply the recursive L-system rules to the current gram
         Returns
         -------
         None
 
         """
-        if len(self.l_string) is not 0:
-            self.l_string = ''.join([self.next_char(c) for c in self.l_string])
+        if len(l_string) is not 0:
+            l_string = ''.join([self.next_char(c) for c in l_string])
         else:
-            self.l_string = self.l_string + self.axioms
+            l_string = l_string + self.axioms
+
+        return l_string
 
     def next_char(self, c):
         rule = self.rules.get(c, c)
@@ -170,18 +187,21 @@ class BuilderBase:
     inherited by a class that also inherites from the L-System class.
     """
     def __init__(self,
-                 lstring,
+                 # lstring,
                  point,
                  vector,
                  length,
                  angle,
-                 lenght_scale_factor=1,
-                 turning_angle_inc=0,
-                 buffer_diameter=0.5):
+                 len_scale_factor=1,
+                 angle_inc=0):
         """
 
         Parameters
         ----------
+        angle_inc : float or int
+            the angle in degrees for changes in direction.
+        len_scale_factor : float
+            the scale factor for shrinking and growing line length
         point : array like
             the starting point for the l-system
         vector : array like
@@ -191,15 +211,14 @@ class BuilderBase:
         angle : float
             the angle of deviation
         """
-        self.buffer_diameter = buffer_diameter
-        self.lstring = lstring
-        self.angle = angle
-        self.point = point
-        self.vector = vector
-        self.length = length
-        self.turning_angle_inc = turning_angle_inc
-        self.length_scale_factor = lenght_scale_factor
-        self.point_list = []
+        # self.lstring = lstring
+        self.angle_base = angle
+        self.point_base = point
+        self.vector_base = vector
+        self.length_base = length
+        self.length_scale_factor_base = len_scale_factor
+        self.turning_angle_inc_base = angle_inc
+        # self.buffer_radius_base = buffer_radius
         self.mapping = {"$": self.start_of_string,
                         "~": self.end_of_string,
                         "F": self.move_forward_draw,
@@ -213,14 +232,36 @@ class BuilderBase:
                         "(": self.decriment_angle,
                         "1": self.move_forward_draw,
                         "0": self.move_forward_draw,
-                        "[": self.push_to_buffer,
-                        "]": self.pop_from_buffer}
+                        "[": self.push_to_stack,
+                        "]": self.pop_from_stack}
+        self.angle = None
+        self.point = None
+        self.vector = None
+        self.length = None
+        self.length_scale_factor = None
+        self.turning_angle_inc = None
+        # self.buffer_radius = None
+        self.point_list = None
         self.active_chars = None
         self.control_chars = None
-        self.buffer = []
+        self.stack = None
+        self.coords = None
+
+    def reset_params(self):
+        self.angle = self.angle_base
+        self.point = self.point_base
+        self.vector = self.vector_base
+        self.length = self.length_base
+        self.length_scale_factor = self.length_scale_factor_base
+        self.turning_angle_inc = self.turning_angle_inc_base
+        # self.buffer_radius = self.buffer_radius_base
+        self.point_list = []
+        self.active_chars = None
+        self.control_chars = None
+        self.stack = []
         self.coords = []
 
-    def get_active_sequence(self):
+    def get_active_sequence(self, lstring):
         """
         takes the l-string provided and strips out the characters that are
         not associated with creating or actioning the parts. Essentially
@@ -230,20 +271,23 @@ class BuilderBase:
 
         """
         self.control_chars = ''.join(self.mapping.keys())
-        self.active_chars = ''.join([x for x in self.lstring if x in
+        self.active_chars = ''.join([x for x in lstring if x in
                                      self.control_chars])
         self.active_chars = "$" + self.active_chars + "~"
 
-    def build_point_list(self):
+    def build_point_list(self, lstring):
         """
         reads the l-string active componets and finds all of the coordinates.
         Returns
         -------
 
         """
-        self.get_active_sequence()
+        self.reset_params()
+        self.get_active_sequence(lstring)
         for letter in self.active_chars:
             self.mapping[letter]()
+
+        return self.coords
 
     def move_forward_draw(self):
         """
@@ -337,20 +381,20 @@ class BuilderBase:
     def increment_angle(self):
         self.angle += self.turning_angle_inc
 
-    def push_to_buffer(self):
+    def push_to_stack(self):
         """
         append the current point and vector to a list for later
         Returns
         -------
 
         """
-        self.buffer.append([self.point,
-                            self.vector,
-                            self.length,
-                            self.turning_angle_inc,
-                            self.length_scale_factor])
+        self.stack.append([self.point,
+                           self.vector,
+                           self.length,
+                           self.turning_angle_inc,
+                           self.length_scale_factor])
 
-    def pop_from_buffer(self):
+    def pop_from_stack(self):
         """
         append the current point and vector to a list for later
         Returns
@@ -361,7 +405,7 @@ class BuilderBase:
         if len(self.point_list) > 1:
             self.coords.append(self.point_list)
         self.point, self.vector, self.length, self.turning_angle_inc,  \
-        self.length_scale_factor = self.buffer.pop(-1)
+        self.length_scale_factor = self.stack.pop(-1)
         self.point_list = [self.point]
 
     def end_of_string(self):
@@ -410,17 +454,17 @@ class BuilderFR(BuilderBase):
                              length,
                              angle)
 
-    def push_to_buffer(self):
+    def push_to_stack(self):
         """
         append the current point and vector to a list for later
         Returns
         -------
 
         """
-        self.buffer.append([self.point, self.vector])
+        self.stack.append([self.point, self.vector])
         self.rotate_left()
 
-    def pop_from_buffer(self):
+    def pop_from_stack(self):
         """
         append the current point and vector to a list for later
         Returns
@@ -430,7 +474,7 @@ class BuilderFR(BuilderBase):
 
         if len(self.point_list) > 1:
             self.coords.append(self.point_list)
-        self.point, self.vector = self.buffer.pop(-1)
+        self.point, self.vector = self.stack.pop(-1)
         self.point_list = [self.point]
         self.rotate_right()
 
@@ -441,10 +485,10 @@ class Plotter:
     presumes that it will be inherited by a class that also inherites from the
      L-System class.
     """
-    def __init__(self):
-        pass
+    def __init__(self, feed_radius):
+        self.feed_radius = feed_radius
 
-    def simple_plot(self):
+    def simple_plot(self, coords):
         """
         A plotting tool for a single line
         Returns
@@ -453,9 +497,9 @@ class Plotter:
         """
         fig = plt.figure(1, figsize=(5, 5), dpi=180)
         ax = fig.add_subplot(111)
-        line = LineString(self.coords)
+        line = LineString(coords)
 
-        dilated = line.buffer(self.buffer_diameter)
+        dilated = line.buffer(self.feed_radius)
         patch1 = PolygonPatch(dilated, facecolor='#99ccff', edgecolor='#6699cc')
         ax.add_patch(patch1)
         x, y = line.xy
@@ -463,7 +507,7 @@ class Plotter:
         ax.plot(x, y, color='#999999')
         plt.show()
 
-    def multi_line_plot(self):
+    def multi_line_plot(self, coords):
         """
         a plotting tool for branching creatures
         Returns
@@ -472,12 +516,12 @@ class Plotter:
         """
         fig = plt.figure(1, figsize=(5, 5), dpi=180)
         ax = fig.add_subplot(111)
-        line = MultiLineString(self.coords)
+        line = MultiLineString(coords)
 
-        dilated = line.buffer(self.buffer_diameter)
+        dilated = line.buffer(self.feed_radius)
         patch1 = PolygonPatch(dilated, facecolor='#99ccff', edgecolor='#6699cc')
         ax.add_patch(patch1)
-        for i in range(len(self.coords)):
+        for i in range(len(coords)):
             x, y = line[i].xy
             plt.axis('equal')
             ax.plot(x, y, color='#999999')
@@ -497,7 +541,7 @@ class Plotter:
         patches = [PolygonPatch(circ) for circ in self.feed_zones]
         for patch in patches:
             ax.add_patch(patch)
-        dilated = line.buffer(self.buffer_diameter)
+        dilated = line.buffer(self.feed_radius)
         patch1 = PolygonPatch(dilated, facecolor='#99ccff', edgecolor='#6699cc')
         ax.add_patch(patch1)
 
@@ -515,49 +559,52 @@ class Environment:
     some of the things I am interested in are the length and area of the
     creature so that I can calculate their efficiency
     """
-    def __init__(self):
+    def __init__(self, feed_radius=0.5):
         """
         initialise the environment
         """
-        self.creature = None
-        self.creature_feed_zone = None
-        self.creature_length = None
-        self.creature_feed_zone = None
-        self.creature_fitness = None
-        self.feed_zones = []
+        self.feed_radius = feed_radius
+        # self.creature = None
+        # self.creature_feed_zone = None
+        # self.creature_length = None
+        # self.creature_feed_zone = None
+        # self.creature_fitness = None
+        # self.feed_zones = []
 
-    def place_feed_zones(self, feed_zones):
+    # def place_feed_zones(self, feed_zones):
+    #     """
+    #     place some objectives in the environment. For a start we will simple
+    #     place selected regions of rewards rather than simply using the size
+    #     to determine fitness.
+    #     Parameters
+    #     ----------
+    #     feed_zones : list of tuples
+    #         a list of thrupples containing the x, y positions for the food
+    #         source. the final value in the thrupple is the radius of the feed
+    #         zone
+    #
+    #     Returns
+    #     -------
+    #
+    #     """
+    #     self.feed_zones = [Point(zone[0], zone[1]).buffer(zone[2]) for zone in
+    #                        feed_zones]
+
+    def get_fitness(self, creature_feed_area):
         """
-        place some objectives in the environment. For a start we will simple
-        place selected regions of rewards rather than simply using the size
-        to determine fitness.
-        Parameters
-        ----------
-        feed_zones : list of tuples
-            a list of thrupples containing the x, y positions for the food
-            source. the final value in the thrupple is the radius of the feed
-            zone
 
         Returns
         -------
 
         """
-        self.feed_zones = [Point(zone[0], zone[1]).buffer(zone[2]) for zone in
-                           feed_zones]
+        return creature_feed_area.area
 
-    def get_fitness(self):
-        """
+    def expose_to_environment(self, coords):
+        creature = MultiLineString(coords)
+        creature_length = creature.length
+        creature_feed_area = creature.buffer(self.feed_radius)
+        fitness = self.get_fitness(creature_feed_area)
 
-        Returns
-        -------
-
-        """
-        self.creature_fitness = self.creature_feed_zone.area
-
-    def expose_to_environment(self):
-        self.creature = MultiLineString(self.coords)
-        self.creature_length = self.creature.length
-        self.creature_feed_zone = self.creature.buffer(self.buffer_diameter)
-        self.get_fitness()
+        return creature_length, creature_feed_area, fitness
 
 

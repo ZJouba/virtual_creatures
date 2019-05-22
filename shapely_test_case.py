@@ -4,13 +4,13 @@ a test case to determine whether or not shapely polygon patch calculates the
 area that I expect when there is overlap.
 Test cases are of interest
     case 1 - independant coords
-        two unit coords with a half unit buffer spaced 1.5 units apart
+        two unit coords with a half unit stack spaced 1.5 units apart
     case 2 - touching polygons
-        two coords with half unit buffer space 1 unit appart
+        two coords with half unit stack space 1 unit appart
     case 3 overlap
-        two coords with half unit buffer spaced half unit appart
+        two coords with half unit stack spaced half unit appart
     case 4 - crossing coords
-        two perpendicular coords with half init buffer
+        two perpendicular coords with half init stack
 """
 
 import matplotlib.pyplot as plt
