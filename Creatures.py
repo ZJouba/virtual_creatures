@@ -393,7 +393,6 @@ if __name__ == "__main__":
               "angle": 25}
 
     sys = Worm(params)
-
     sys.build_point_list()
     sys.expose_to_environment()
     feed_zones = [(0, 0, 3), (10, 0, 3), (0, 10, 3)]

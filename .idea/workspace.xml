@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="b8c2f3a0-d01d-415a-8524-2381fea494ae" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/EVC_gpu.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/CreaturePopulationEvaluation.py" beforeDir="false" afterPath="$PROJECT_DIR$/CreaturePopulationEvaluation.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/CreatureTools.py" beforeDir="false" afterPath="$PROJECT_DIR$/CreatureTools.py" afterDir="false" />
@@ -30,20 +31,20 @@
               </provider>
             </entry>
           </file>
-          <file pinned="false" current-in-tab="true">
+          <file pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/Creatures.py">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="320">
-                  <caret line="389" column="39" selection-start-line="389" selection-start-column="39" selection-end-line="389" selection-end-column="39" />
+                <state relative-caret-position="-257">
+                  <caret line="341" column="6" selection-start-line="341" selection-start-column="6" selection-end-line="341" selection-end-column="6" />
                 </state>
               </provider>
             </entry>
           </file>
-          <file pinned="false" current-in-tab="false">
+          <file pinned="false" current-in-tab="true">
             <entry file="file://$PROJECT_DIR$/CreatureTools.py">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="337">
-                  <caret line="554" column="32" selection-start-line="554" selection-start-column="32" selection-end-line="554" selection-end-column="32" />
+                <state relative-caret-position="2803">
+                  <caret line="437" column="6" selection-start-line="437" selection-start-column="6" selection-end-line="437" selection-end-column="6" />
                   <folding>
                     <element signature="e#0#18#0" expanded="true" />
                   </folding>
@@ -54,8 +55,8 @@
           <file pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/CreaturePopulationEvaluation.py">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="1054">
-                  <caret line="62" column="36" lean-forward="true" selection-start-line="62" selection-start-column="36" selection-end-line="62" selection-end-column="36" />
+                <state relative-caret-position="506">
+                  <caret line="65" column="37" lean-forward="true" selection-start-line="65" selection-start-column="37" selection-end-line="65" selection-end-column="37" />
                   <folding>
                     <element signature="e#0#23#0" expanded="true" />
                   </folding>
@@ -84,10 +85,10 @@
           <file pinned="false" current-in-tab="true">
             <entry file="file://$PROJECT_DIR$/play.py">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="184">
-                  <caret line="19" column="8" lean-forward="true" selection-start-line="19" selection-start-column="8" selection-end-line="19" selection-end-column="32" />
+                <state relative-caret-position="747">
+                  <caret line="73" selection-start-line="73" selection-end-line="73" />
                   <folding>
-                    <element signature="e#3#21#0" expanded="true" />
+                    <element signature="e#1228#1249#0" expanded="true" />
                   </folding>
                 </state>
               </provider>
@@ -134,10 +135,11 @@
         <option value="$PROJECT_DIR$/shapely_test_case.py" />
         <option value="$PROJECT_DIR$/EVC2.py" />
         <option value="$PROJECT_DIR$/__init__.py" />
-        <option value="$PROJECT_DIR$/CreaturePopulationEvaluation.py" />
-        <option value="$PROJECT_DIR$/play.py" />
+        <option value="$PROJECT_DIR$/EVC_gpu.py" />
         <option value="$PROJECT_DIR$/Creatures.py" />
         <option value="$PROJECT_DIR$/CreatureTools.py" />
+        <option value="$PROJECT_DIR$/play.py" />
+        <option value="$PROJECT_DIR$/CreaturePopulationEvaluation.py" />
       </list>
     </option>
   </component>
@@ -248,10 +250,11 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="0" y="25" width="1920" height="1055" extended-state="6" />
+    <frame x="0" y="-2" width="1920" height="1062" extended-state="6" />
+    <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" sideWeight="0.48056155" visible="true" weight="0.17129135" />
-      <window_info id="Structure" order="1" sideWeight="0.51943845" side_tool="true" visible="true" weight="0.17129135" />
+      <window_info content_ui="combo" id="Project" order="0" sideWeight="0.48" visible="true" weight="0.17289221" />
+      <window_info active="true" id="Structure" order="1" sideWeight="0.52" side_tool="true" visible="true" weight="0.17289221" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" weight="0.3297062" />
@@ -263,7 +266,7 @@
       <window_info anchor="bottom" id="Version Control" order="7" weight="0.32861805" />
       <window_info anchor="bottom" id="Terminal" order="8" weight="0.31101513" />
       <window_info anchor="bottom" id="Event Log" order="9" sideWeight="0.50158125" side_tool="true" weight="0.3079434" />
-      <window_info active="true" anchor="bottom" id="Python Console" order="10" sideWeight="0.49841872" visible="true" weight="0.2861771" />
+      <window_info anchor="bottom" id="Python Console" order="10" sideWeight="0.49841872" visible="true" weight="0.28648648" />
       <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
@@ -364,33 +367,40 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/CreaturePopulationEvaluation.py">
+    <entry file="file://$PROJECT_DIR$/EVC_gpu.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1054">
-          <caret line="62" column="36" lean-forward="true" selection-start-line="62" selection-start-column="36" selection-end-line="62" selection-end-column="36" />
-          <folding>
-            <element signature="e#0#23#0" expanded="true" />
-          </folding>
+        <state relative-caret-position="-599">
+          <caret line="26" column="48" selection-start-line="26" selection-start-column="48" selection-end-line="26" selection-end-column="48" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Creatures.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-257">
+          <caret line="341" column="6" selection-start-line="341" selection-start-column="6" selection-end-line="341" selection-end-column="6" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/play.py">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
-    <entry file="file://$PROJECT_DIR$/CreatureTools.py">
+    <entry file="file://$PROJECT_DIR$/CreaturePopulationEvaluation.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="337">
-          <caret line="554" column="32" selection-start-line="554" selection-start-column="32" selection-end-line="554" selection-end-column="32" />
+        <state relative-caret-position="506">
+          <caret line="65" column="37" lean-forward="true" selection-start-line="65" selection-start-column="37" selection-end-line="65" selection-end-column="37" />
           <folding>
-            <element signature="e#0#18#0" expanded="true" />
+            <element signature="e#0#23#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/Creatures.py">
+    <entry file="file://$PROJECT_DIR$/CreatureTools.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="320">
-          <caret line="389" column="39" selection-start-line="389" selection-start-column="39" selection-end-line="389" selection-end-column="39" />
+        <state relative-caret-position="2803">
+          <caret line="437" column="6" selection-start-line="437" selection-start-column="6" selection-end-line="437" selection-end-column="6" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>

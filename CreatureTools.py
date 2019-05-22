@@ -522,7 +522,7 @@ class Environment:
         self.creature = None
         self.creature_feed_zone = None
         self.creature_length = None
-        self.creature_area = None
+        self.creature_feed_zone = None
         self.creature_fitness = None
         self.feed_zones = []
 
@@ -552,13 +552,12 @@ class Environment:
         -------
 
         """
-        self.creature_fitness = self.creature_feed_zone.intersection(self.feed_zones)
+        self.creature_fitness = self.creature_feed_zone.area
 
     def expose_to_environment(self):
         self.creature = MultiLineString(self.coords)
         self.creature_length = self.creature.length
         self.creature_feed_zone = self.creature.buffer(self.buffer_diameter)
-        self.creature_area = self.creature_feed_zone.area
         self.get_fitness()
 
 
