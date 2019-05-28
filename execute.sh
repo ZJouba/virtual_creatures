@@ -18,6 +18,9 @@
 # Select number of processors
 #PBS -l select=1:ncpus=16
 
+# Load correct python
+module load python/3.5.0
+
 # This command switched to the directory from which the "qsub" command was run:
 cd $PBS_O_WORKDIR
 
@@ -25,6 +28,6 @@ cd $PBS_O_WORKDIR
 export OMP_NUM_THREADS=16
 
 #  Now run my program
-python montepython_1.2.py
+python3 montepython_1.2.py
 
 echo Done!
