@@ -1,11 +1,12 @@
 from CreatureTools_n import Creature
 import numpy as np
-from tqdm import tqdm
 import multiprocessing as mp
 import os
 import pandas as pd
 from datetime import datetime
 from scipy.interpolate import interp1d
+import time
+import sys
 
 
 def genGen():
@@ -67,8 +68,13 @@ if __name__ == "__main__":
 
     iter = 1000000
 
+    toolbar_width = iter
+
+    sys.stdout.write("[%s]" % (" " * toolbar_width))
+    sys.stdout.flush()
+    sys.stdout.write("\b" * (toolbar_width+1))
+
     with mp.Pool() as pool:
-        pbar = tqdm(total=iter, smoothing=0.5)
         population = [[
             'L-string',
             'Coordinates',
@@ -85,15 +91,14 @@ if __name__ == "__main__":
             'Average chars between -s'
         ]]
 
-        def update(*a):
-            pbar.update()
-
-        for i in range(pbar.total):
-            results = pool.apply_async(genGen, callback=update)
+        for i in range(iter):
+            results = pool.apply_async(genGen)
             population.append(results.get())
+            sys.stdout.write("-")
+            sys.stdout.flush()
 
+    sys.stdout.write("]\n")
     pool.join()
-    pbar.close()
 
     population = pd.DataFrame(population[1:], columns=population[0])
 

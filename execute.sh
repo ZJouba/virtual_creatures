@@ -19,6 +19,7 @@
 #PBS -l select=1:ncpus=16
 
 # Load correct python
+module load app/GEOS/3.6.2-gcc-4.4.7
 module load python/3.5.0
 
 # This command switched to the directory from which the "qsub" command was run:
