@@ -36,7 +36,7 @@ class Creature:
         self.l_string = params.get('axiom')
         self.constants = params.get('constants')
         self.variables = params.get('variables')
-        self.angle = params.get('angle')
+        self.angle = radians(params.get('angle'))
         self.recur(params.get('num_char'))
         self.length = params.get('length')
         self.mapper()
@@ -58,18 +58,7 @@ class Creature:
             return rule
 
     def mapper(self):
-        theta = 1.570
-
-        if isinstance(self.angle, int):
-            randomAngle = False
-        elif self.angle == 'random':
-            randomAngle = True
-
-        def getAngle():
-            if randomAngle:
-                return (np.random.uniform(0, 0.5) * pi)
-            else:
-                return radians(self.angle)
+        theta = 0
 
         num_chars = len(self.l_string)
 
@@ -85,25 +74,25 @@ class Creature:
 
         rotVec = makeRotMat(theta)
 
-        begin_vec = np.array((1, 0, 0), np.float64)
+        dir_vec = np.array((0, 1, 0), np.float64)
         i = 1
 
         for c in self.l_string:
             if c == 'F':
-                next_vec = np.dot(rotVec, begin_vec)
                 coords[i] = (
-                    coords[i-1] + (self.length * next_vec)
+                    coords[i-1] + (self.length * dir_vec)
                 )
                 i += 1
-                begin_vec = next_vec
 
             if c == '-':
-                theta = theta - getAngle()
+                theta = theta - self.angle
                 rotVec = makeRotMat(theta)
+                dir_vec = np.dot(rotVec, dir_vec)
 
             if c == '+':
-                theta = theta + getAngle()
+                theta = theta + self.angle
                 rotVec = makeRotMat(theta)
+                dir_vec = np.dot(rotVec, dir_vec)
 
         coords = np.delete(coords, np.s_[i:], 0)
         self.coords = coords

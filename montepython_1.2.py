@@ -38,7 +38,7 @@ def genGen():
         'point': np.array([0, 0]),
         'vector': np.array([0, 1]),
         'length': 1.0,
-        'angle': 25  # random
+        'angle': np.random.randint(0, 90)  # random
     }
 
     c = Creature(params)
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     timings = []
     iterations = []
 
-    iter = 1000000
+    iter = 100000
 
     with mp.Pool() as pool:
         pbar = tqdm(total=iter, smoothing=0.5)
@@ -99,8 +99,9 @@ if __name__ == "__main__":
 
     curr_dir = os.path.dirname(__file__)
 
-    now = datetime.utcnow().strftime('%H.%M-%d.%m.%y')
-    file_name = os.path.join(curr_dir, 'monte_carlo_' + now + '_.csv')
+    now = datetime.utcnow().strftime('%b %d, %Y @ %H.%M')
+    file_name = os.path.join(
+        curr_dir, 'CSVs\\monte_carlo ' + now + '_.csv')
 
     population.to_csv(file_name, index=None, header=True,
                       chunksize=10000)

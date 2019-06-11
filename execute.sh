@@ -16,7 +16,7 @@
 #PBS -m abe
 
 # Select number of processors
-#PBS -l select=1:ncpus=16
+#PBS -l select=1:ncpus=16:mem=16GB
 
 # Load correct python
 module load app/GEOS/3.6.2-gcc-4.4.7
@@ -29,6 +29,6 @@ cd $PBS_O_WORKDIR
 export OMP_NUM_THREADS=16
 
 #  Now run my program
-python3 montepython_1.2.py
+python3 montepython_hpc.py
 
 echo Done!

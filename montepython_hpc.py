@@ -4,9 +4,8 @@ import multiprocessing as mp
 import os
 import pandas as pd
 from datetime import datetime
-from scipy.interpolate import interp1d
-import time
 import sys
+import time
 
 
 def genGen():
@@ -19,8 +18,10 @@ def genGen():
     proba1 = np.random.uniform(0, 1)
     proba2 = 1 - proba1
 
-    rule1 = ''.join([np.random.choice(choices) for _ in range(5)]) + 'X'
-    rule2 = ''.join([np.random.choice(choices) for _ in range(5)]) + 'X'
+    rule1 = ''.join([np.random.choice(choices)
+                     for _ in range(5)]) + 'X'
+    rule2 = ''.join([np.random.choice(choices)
+                     for _ in range(5)]) + 'X'
 
     params = {
         'num_char': 100,
@@ -39,7 +40,7 @@ def genGen():
         'point': np.array([0, 0]),
         'vector': np.array([0, 1]),
         'length': 1.0,
-        'angle': 25  # random
+        'angle': np.random.randint(0, 90)  # random
     }
 
     c = Creature(params)
@@ -57,55 +58,67 @@ def genGen():
         c.avgF,
         c.avgP,
         c.avgM,
+        c.angle,
+        c.rules,
     )
 
     return list(a)
 
 
-if __name__ == "__main__":
-    timings = []
-    iterations = []
+def progress(count, total, status=''):
+    bar_len = 60
+    filled_len = int(round(bar_len * count / float(total)))
 
-    iter = 1000000
+    percents = round(100.0 * count / float(total), 1)
+    bar = '=' * filled_len + '-' * (bar_len - filled_len)
 
-    toolbar_width = iter
-
-    sys.stdout.write("[%s]" % (" " * toolbar_width))
+    sys.stdout.write('[%s] %s%s ...%s\r' % (bar, percents, '%', status))
     sys.stdout.flush()
-    sys.stdout.write("\b" * (toolbar_width+1))
+
+
+if __name__ == "__main__":
+
+    iter = 20000
+    population = []
+    population = [[
+        'L-string',
+        'Coordinates',
+        'Area',
+        'Bounding Coordinates',
+        '% of F',
+        '% of +',
+        '% of -',
+        'Longest F sequence',
+        'Longest + sequence',
+        'Longest - sequence',
+        'Average chars between Fs',
+        'Average chars between +s',
+        'Average chars between -s',
+        'Angle',
+        'Rules'
+    ]]
 
     with mp.Pool() as pool:
-        population = [[
-            'L-string',
-            'Coordinates',
-            'Area',
-            'Bounding Coordinates',
-            '% of F',
-            '% of +',
-            '% of -',
-            'Longest F sequence',
-            'Longest + sequence',
-            'Longest - sequence',
-            'Average chars between Fs',
-            'Average chars between +s',
-            'Average chars between -s'
-        ]]
 
         for i in range(iter):
+            progress(i, iter, status='Doing job')
+
+            np.random.seed()
+
             results = pool.apply_async(genGen)
             population.append(results.get())
-            sys.stdout.write("-")
-            sys.stdout.flush()
 
-    sys.stdout.write("]\n")
     pool.join()
+
+    sys.stdout.write('Done! Writing to CSV')
+    sys.stdout.flush()
 
     population = pd.DataFrame(population[1:], columns=population[0])
 
     curr_dir = os.path.dirname(__file__)
 
-    now = datetime.utcnow().strftime('%H.%M-%d.%m.%y')
-    file_name = os.path.join(curr_dir, 'monte_carlo_' + now + '_.csv')
+    now = datetime.utcnow().strftime('%b %d, %Y @ %H.%M')
+    file_name = os.path.join(
+        curr_dir, 'monte_carlo ' + now + '_.csv')
 
-    population.to_csv(file_name, index=None, header=True,
-                      chunksize=10000)
+    population.to_csv(file_name, index=None, header=True)

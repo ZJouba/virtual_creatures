@@ -1,28 +1,29 @@
+from bokeh.io import output_file, show, export_png, export_svgs
+from bokeh.plotting import figure, curdoc
+from bokeh.models import ColumnDataSource, HoverTool, Label, BoxZoomTool, ResetTool
+from bokeh.layouts import gridplot
+from bokeh.models.glyphs import Patch
+from bokeh.events import Tap
 import pandas as pd
-import time
+from shapely.geometry import LineString
 import dask.dataframe as dd
 from dask.diagnostics import ProgressBar
-import itertools
 import numpy as np
 from tkinter import filedialog
 import tkinter as tk
 import os
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib.patches as mp
 from grid_strategy import strategies
 import gc
+import ast
+from descartes.patch import PolygonPatch
+import sys
 
-# from bokeh.layouts import gridplot
-# from bokeh.plotting import figure, show, output_file
-# from bokeh.sampledata.autompg import autompg
-# from bokeh.transform import jitter
-# from bokeh.models import (BasicTicker, ColumnDataSource, Grid, LinearAxis,
-#                           DataRange1d, PanTool, Plot, WheelZoomTool)
-# from bokeh.models.glyphs import Circle
-
+curDir = os.path.dirname(__file__)
 root = tk.Tk()
 root.withdraw()
-curDir = os.path.dirname(__file__)
 
 ProgressBar().register()
 
@@ -33,75 +34,118 @@ monteData = dd.read_csv(filepath)
 
 monteData.fillna(0)
 
-plotData = monteData.sample(frac=0.01)
+plotData = monteData.sample(frac=0.0001)
 
 plotData = plotData.compute()
 
 gc.collect()
+
+# plotData = pd.read_csv(os.path.join(curDir, 'test.csv'))
 
 plotData['L-string'].drop_duplicates()
 plotData.reset_index()
 
 gc.collect()
 
-plotData = plotData[['Area', '% of F', '% of +', '% of -', 'Longest F sequence', 'Longest + sequence',
+plotData = plotData[['L-string', 'Area', '% of F', '% of +', '% of -', 'Longest F sequence', 'Longest + sequence',
                      'Longest - sequence', 'Average chars between Fs', 'Average chars between +s', 'Average chars between -s']]
 
-num_render = len(plotData.columns)
-specs = strategies.SquareStrategy('center').get_grid(num_render)
+source = ColumnDataSource(data=plotData)
 
-fig = plt.figure()
+tooltips1 = [
+    ('index', '$index'),
+    ('F', '@{% of F}{0.0%}'),
+    ('+', '@{% of +}{0.0%}'),
+    ('-', '@{% of -}{0.0%}'),
+]
+tooltips2 = [
+    ('index', '$index'),
+    ('F', '@{Longest F sequence}'),
+    ('+', '@{Longest + sequence}'),
+    ('-', '@{Longest - sequence}'),
+]
 
-gc.collect()
+plots_width = 500
+plots_height = 500
 
-for column, sub in zip(plotData.columns, specs):
-    ax = fig.add_subplot(sub)
-    if column in ['Longest F sequence', 'Longest + sequence', 'Longest - sequence', 'Average chars between Fs', 'Average chars between +s', 'Average chars between -s']:
-        sns.barplot(plotData.Area, plotData[column], ax=ax)
-    else:
-        # sns.scatterplot(plotData.Area, plotData[column], ax=ax, size=0.5)
-        sns.jointplot(plotData.Area, plotData[column], kind='kde')
+p1 = figure(plot_width=plots_width, plot_height=plots_height, tools='pan,wheel_zoom,box_zoom,reset,tap,save',
+            title="Area", output_backend="webgl", tooltips=tooltips1)
+p1.xaxis.axis_label = 'Area'
+p1.yaxis.axis_label = '% of character'
+p1.scatter('Area', '% of F', size=7, source=source,
+           fill_color='red', legend='F', alpha=0.6)
 
+p2 = figure(plot_width=plots_width, plot_height=plots_height, tools='pan,wheel_zoom,box_zoom,reset,tap,save',
+            title="Area", output_backend="webgl", tooltips=tooltips2)
+p2.xaxis.axis_label = 'Area'
+p2.yaxis.axis_label = 'Length of sequence'
+p2.scatter('Area', 'Longest F sequence', size=7, source=source,
+           fill_color='red', legend='F', alpha=0.6)
+p2.scatter('Area', 'Longest + sequence', size=7, source=source,
+           fill_color='blue', legend='+', alpha=0.6)
+p2.scatter('Area', 'Longest - sequence', size=7, source=source,
+           fill_color='green', legend='-', alpha=0.6)
 
-# xdr = DataRange1d(bounds=None)
-# ydr = DataRange1d(bounds=None)
+p3 = figure(plot_width=plots_width, plot_height=plots_height, tools='pan,wheel_zoom,box_zoom,reset,tap,save',
+            title="Selected Creature", output_backend="webgl", toolbar_location="below")
+# p3.line(x=coords[:, 0], y=coords[:, 1], line_color='red')
+# p3.patch(x=patch_x, y=patch_y)
+# for i, _ in enumerate(creature_patch.interiors):
+#     inside_x, inside_y = creature_patch.interiors[i].coords.xy
+#     p3.patch(x=inside_x, y=inside_y, fill_color='white')
 
-
-# def make_plot(xname, yname, type):
-#     plot = Plot(
-#         x_range=xdr, y_range=ydr, background_fill_color="#efe8e2",
-#         border_fill_color='white', plot_width=200, plot_height=200,
-#         min_border_left=2, min_border_right=2, min_border_top=2, min_border_bottom=2)
-
-#     if type == 'Bar':
-#         plot.vbar(x=xname, y=yname)
-#     elif type == 'Circle':
-#         circle = Circle(x=xname, y=yname, fill_color="color",
-#                         fill_alpha=0.2, size=4, line_color="color")
-#         r = plot.add_glyph(source, circle)
-#         xdr.renderers.append(r)
-#         ydr.renderers.append(r)
-
-#     xticker = BasicTicker()
-#     plot.add_layout(Grid(dimension=0, ticker=xticker))
-
-#     yticker = BasicTicker()
-#     plot.add_layout(Grid(dimension=1, ticker=yticker))
-
-#     plot.add_tools(PanTool(), WheelZoomTool())
-
-#     return plot
-
-
-# plots = []
-# for column in plotData.columns:
-#     if column in ['Longest F sequence', 'Longest + sequence', 'Longest - sequence', 'Average chars between Fs', 'Average chars between +s', 'Average chars between -s']:
-#         window = make_plot(plotData['Area'], plotData[column], type='Bar')
-#         plots.append(window)
-#     else:
-#         window = make_plot(plotData['Area'], plotData[column], type='Circle')
-#         plots.append(window)
+g = gridplot([[p1, p2, p3]])
 
 
-# show(gridplot(plots))
-plt.show()
+def plot_creature(event):
+    creature_index = source.selected.index
+    print(source.selected.index)
+    creature = plotData.loc[creature_index, :]
+
+    coords = np.array(ast.literal_eval(creature['Coordinates']))
+
+    creature_morphology = LineString(coords[:, 0:2])
+    creature_patch = creature_morphology.buffer(0.5)
+    patch_x, patch_y = creature_patch.exterior.coords.xy
+
+    p3.line(x=coords[:, 0], y=coords[:, 1], line_color='red')
+    p3.patch(x=patch_x, y=patch_y)
+    for i, _ in enumerate(creature_patch.interiors):
+        inside_x, inside_y = creature_patch.interiors[i].coords.xy
+        p3.patch(x=inside_x, y=inside_y, fill_color='white')
+
+    area_label = Label(
+        x=0,
+        y=400,
+        x_units='screen',
+        y_units='screen',
+        text='Area: {:.2f}'.format(creature['Area']),
+        render_mode='css',
+        border_line_color='black',
+        border_line_alpha=1.0,
+        background_fill_color='white',
+        background_fill_alpha=1.0,
+    )
+
+    length_label = Label(
+        x=0,
+        y=380,
+        x_units='screen',
+        y_units='screen',
+        text='Length of L-string: {}'.format(len(creature['L-string'])),
+        render_mode='css',
+        border_line_color='black',
+        border_line_alpha=1.0,
+        background_fill_color='white',
+        background_fill_alpha=1.0,
+    )
+
+    p3.add_layout(area_label)
+    p3.add_layout(length_label)
+
+
+p1.on_event(Tap, plot_creature)
+p2.on_event(Tap, plot_creature)
+# export_png(g, filename=os.path.join(curDir, "plot.png"))
+
+curdoc().add_root(g)
