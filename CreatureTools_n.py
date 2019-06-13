@@ -58,41 +58,38 @@ class Creature:
             return rule
 
     def mapper(self):
-        theta = 0
+        """Converts L-string to coordinates
+
+        Returns
+        -------
+        List
+            List of coordinates
+        """
 
         num_chars = len(self.l_string)
 
         coords = np.zeros((num_chars + 1, 3), np.double)
 
-        def makeRotMat(theta):
-            rotMat = np.array((
-                (cos(theta), -sin(theta), 0),
-                (sin(theta), cos(theta), 0),
-                (0, 0, 1)
-            ))
-            return rotMat
+        rotVec = np.array((
+            (cos(self.angle), -sin(self.angle), 0),
+            (sin(self.angle), cos(self.angle), 0),
+            (0, 0, 1)
+        ))
 
-        rotVec = makeRotMat(theta)
-
-        dir_vec = np.array((0, 1, 0), np.float64)
+        start_vec = np.array((0, 1, 0), np.float64)
+        curr_vec = start_vec
         i = 1
 
         for c in self.l_string:
             if c == 'F':
-                coords[i] = (
-                    coords[i-1] + (self.length * dir_vec)
-                )
+                coords[i] = (coords[i-1] + (self.length * curr_vec))
                 i += 1
 
             if c == '-':
-                theta = theta - self.angle
-                rotVec = makeRotMat(theta)
-                dir_vec = np.dot(rotVec, dir_vec)
+                curr_vec = np.dot(curr_vec, (-1*rotVec))
 
             if c == '+':
-                theta = theta + self.angle
-                rotVec = makeRotMat(theta)
-                dir_vec = np.dot(rotVec, dir_vec)
+                curr_vec = np.dot(curr_vec, rotVec)
 
         coords = np.delete(coords, np.s_[i:], 0)
         self.coords = coords

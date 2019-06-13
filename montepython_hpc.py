@@ -6,6 +6,7 @@ import pandas as pd
 from datetime import datetime
 import sys
 import time
+import pickle
 
 
 def genGen():
@@ -46,7 +47,7 @@ def genGen():
     c = Creature(params)
     a = (
         c.l_string,
-        c.coords.tolist(),
+        c.coords,
         c.area,
         c.bounds,
         c.perF,
@@ -119,6 +120,6 @@ if __name__ == "__main__":
 
     now = datetime.utcnow().strftime('%b %d, %Y @ %H.%M')
     file_name = os.path.join(
-        curr_dir, 'monte_carlo ' + now + '_.csv')
+        curr_dir, 'monte_carlo ' + now + '.p')
 
-    population.to_csv(file_name, index=None, header=True)
+    pickle.dump(population, open(file_name, 'wb'))

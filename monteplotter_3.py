@@ -9,7 +9,7 @@ from bokeh.application.handlers import FunctionHandler
 from bokeh.application import Application
 from bokeh.server.server import Server
 from bokeh.transform import linear_cmap, log_cmap
-from bokeh.palettes import RdYlGn10 as palette
+from bokeh.palettes import RdYlGn11 as palette
 from bokeh.embed import file_html
 from bokeh.resources import CDN
 from tornado.ioloop import IOLoop
@@ -35,6 +35,14 @@ import itertools
 
 
 def modify_doc(doc):
+    """Add plots to the document
+
+    Parameters
+    ----------
+    doc : [type]
+        A Bokeh document to which plots can be added
+
+    """
     curDir = os.path.dirname(__file__)
     root = tk.Tk()
     root.withdraw()
@@ -170,6 +178,13 @@ def modify_doc(doc):
     p3.add_layout(length_label)
 
     def plot_source(coords):
+        """[summary]
+
+        Returns
+        -------
+        [type]
+            [description]
+        """
         instance_linestring = LineString(coords[:, 0:2])
         instance_patch = instance_linestring.buffer(0.5)
         instance_x, instance_y = instance_patch.exterior.coords.xy
@@ -216,6 +231,16 @@ def modify_doc(doc):
         return coords
 
     def plot_creature(event):
+        line.data = dict(x=[0, 0], y=[0, 0])
+        polygon.data = dict(x=[0, 0], y=[0, 0])
+        rule1.data = dict(x=[0, 0], y=[0, 0])
+        rule2.data = dict(x=[0, 0], y=[0, 0])
+        rule1_poly.data = dict(x=[0, 0], y=[0, 0])
+        rule2_poly.data = dict(x=[0, 0], y=[0, 0])
+        L_string.text = 'Select creature'
+        area_label.text = 'Select creature'
+        length_label.text = 'Select creature'
+        rule_text.text = 'Select creature'
 
         if len(scatter.selected.indices) > 0:
 
@@ -353,7 +378,7 @@ def modify_doc(doc):
 
 
 def main():
-    """Launch the server and connect to it.
+    """Launch bokeh server and connect to it
     """
 
     print("Preparing a bokeh application.")
