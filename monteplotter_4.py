@@ -30,20 +30,10 @@ from math import radians, cos, sin, pi
 from tabulate import tabulate
 import time
 import pickle
+from nltk.util import ngrams
 
 
-def modify_doc(doc):
-    """Add plots to the document
-
-    Parameters
-    ----------
-    doc : bokeh.document.document.Document
-        A Bokeh document to which plots can be added
-
-    Returns
-    ----------
-        Document
-    """
+def preProcessing():
     root = tk.Tk()
     root.withdraw()
     filepath = filedialog.askopenfilename()
@@ -65,24 +55,46 @@ def modify_doc(doc):
 
     allData['Line Strings'] = linestrings
     allData['% Overlap'] = overlap
-    cr = allData.iloc[1, :]
-    a = cr['Line Strings'].centroid.xy
-    print(a[0])
+    # cr = allData.iloc[1, :]
+    # a = cr['Line Strings'].centroid.x
+    # print(a)
     allData['Centroid_X'] = allData['Line Strings'].apply(
-        lambda x: x.centroid.coords.xy[0].value)
+        lambda x: x.centroid.x)
     allData['Centroid_Y'] = allData['Line Strings'].apply(
-        lambda x: x.centroid.coords.xy[1])
+        lambda x: x.centroid.y)
     allData['Compactness'] = allData['Bounding Coordinates'].apply(
         lambda x: np.linalg.norm(x))
+    allData['Length'] = allData['Line Strings'].apply(
+        lambda x: x.length)
+
+    allData['Rolling n-grams'] = allData['L-string'].apply(
+        lambda x: [[(''.join(tup)) for i in range(2, 6)
+                    for tup in list(ngrams(list(x), i))]]
+    )
+    gc.collect()
 
     for i in range(2, 6):
         allData['{}-gram'.format(i)] = allData['L-string'].apply(lambda x: [x[j:j+i]
                                                                             for j in range(0, len(x), i)])
 
-    gc.collect()
+    allData.reset_index()
+    return allData
 
-    plotData = allData.iloc[:, 1:]
-    # plotData = allData.select_dtypes(include=['float64', 'int64'])
+
+def modify_doc(doc):
+    """Add plots to the document
+
+    Parameters
+    ----------
+    doc : bokeh.document.document.Document
+        A Bokeh document to which plots can be added
+
+    Returns
+    ----------
+        Document
+    """
+
+    plotData = allData.select_dtypes(include=np.number)
 
     scatter = ColumnDataSource(data=plotData)
     line = ColumnDataSource(data=dict(x=[], y=[]))
@@ -91,7 +103,7 @@ def modify_doc(doc):
     polygon = ColumnDataSource(data=dict(x=[], y=[]))
     r_1_poly = ColumnDataSource(data=dict(x=[], y=[]))
     r_2_poly = ColumnDataSource(data=dict(x=[], y=[]))
-    dist = ColumnDataSource(data=dict(x=[], y=[]))
+    dist = ColumnDataSource(data=dict(x=[0], F=[0], P=[0], M=[0]))
 
     palette.reverse()
     mapper = log_cmap(
@@ -117,24 +129,37 @@ def modify_doc(doc):
     """ Plots
     -----------------------------------------------------------------------------------------------------
     """
-    plots_width = 500
-    plots_height = 500
-    per_scatter = figure(plot_width=plots_width, plot_height=plots_height, tools='pan,wheel_zoom,box_zoom,reset,tap,save',
-                         title="Area", output_backend="webgl", tooltips=tooltips1)
+    scargs = {
+        'size': 7,
+        'source': scatter,
+        'color': mapper,
+        'alpha': 0.6,
+        'nonselection_fill_color': mapper,
+        'nonselection_fill_alpha': 0.1,
+        'selection_fill_alpha': 1,
+        'selection_fill_color': 'red',
+    }
+
+    plot_width = 450
+    plot_height = 500
+    fargs = {
+        'plot_width': plot_width,
+        'plot_height': plot_height,
+        'tools': 'pan,wheel_zoom,box_zoom,reset,tap,save,box_select',
+        'output_backend': 'webgl',
+    }
+
+    per_scatter = figure(**fargs, title="Area", tooltips=tooltips1)
     per_scatter.xaxis.axis_label = '% of character'
     per_scatter.yaxis.axis_label = 'Area'
-    per_scatter.scatter('% of F', 'Area', size=7,
-                        source=scatter, color=mapper, alpha=0.6, nonselection_fill_color=mapper)
+    per_scatter.scatter('% of F', 'Area', **scargs)
 
-    seq_scatter = figure(plot_width=plots_width, plot_height=plots_height, tools='pan,wheel_zoom,box_zoom,reset,tap,save',
-                         title="Area", output_backend="webgl", tooltips=tooltips2)
+    seq_scatter = figure(**fargs, title="Area", tooltips=tooltips2)
     seq_scatter.xaxis.axis_label = 'Length of sequence'
     seq_scatter.yaxis.axis_label = 'Area'
-    seq_scatter.scatter('Longest F sequence', 'Area', size=7, source=scatter,
-                        fill_color='red', color=mapper, alpha=0.6, nonselection_fill_color=mapper)
+    seq_scatter.scatter('Longest F sequence', 'Area', **scargs)
 
-    creature_plot = figure(plot_width=plots_width, plot_height=plots_height, tools='pan,wheel_zoom,box_zoom,reset,tap,save',
-                           title="Selected Creature", output_backend="webgl")
+    creature_plot = figure(**fargs, title="Selected Creature")
     creature_plot.axis.visible = False
     creature_plot.grid.visible = False
     creature_plot.multi_polygons(xs='x', ys='y', source=polygon)
@@ -142,58 +167,61 @@ def modify_doc(doc):
     start_point = Cross(x=0, y=0, size=10, line_color='red', line_width=5)
     creature_plot.add_glyph(start_point)
 
-    ang_scatter = figure(plot_width=plots_width, plot_height=plots_height, tools='pan,wheel_zoom,box_zoom,reset,tap,save',
-                         title="Angle", output_backend="webgl", tooltips=tips_angle)
-    ang_scatter.scatter('Angle',  'Area',  size=7,
-                        source=scatter, color=mapper, alpha=0.6, nonselection_fill_color=mapper)
+    ang_scatter = figure(**fargs, title="Angle", tooltips=tips_angle)
+    ang_scatter.scatter('Angle',  'Area', **scargs)
     ang_scatter.xaxis.axis_label = 'Angle (degrees)'
     ang_scatter.yaxis.axis_label = 'Area'
 
-    rule_1_plot = figure(plot_width=300, plot_height=plots_height//2,
-                         title="Rule 1", output_backend="webgl")
+    rule_1_plot = figure(plot_width=300, plot_height=plot_height//2,
+                         title="Rule 1", output_backend="webgl", match_aspect=True)
     rule_1_plot.patch(x='x', y='y', source=r_1_poly)
     rule_1_plot.line(x='x', y='y', line_color='red', source=r_1)
 
-    rule_2_plot = figure(plot_width=300, plot_height=plots_height//2,
-                         title="Rule 2", output_backend="webgl")
+    rule_2_plot = figure(plot_width=300, plot_height=plot_height//2,
+                         title="Rule 2", output_backend="webgl", match_aspect=True)
     rule_2_plot.patch(x='x', y='y', source=r_2_poly)
     rule_2_plot.line(x='x', y='y', line_color='red', source=r_2)
 
-    char_dist = figure(plot_width=plots_width, plot_height=plots_height//2,
+    char_dist = figure(plot_width=plot_width, plot_height=plot_height//2,
                        title="Character distribution", output_backend="webgl"
                        )
     char_dist.varea_stack(['F', 'P', 'M'], x='x',
                           color=brewer['Spectral'][3], legend=['F char', '+ char', '- char'], source=dist)
     char_dist.xaxis.axis_label = 'L-string length'
 
-    overlap_scatter = figure(plot_width=plots_width, plot_height=plots_height, tools='pan,wheel_zoom,box_zoom,reset,tap,save',
-                             title="Overlap", output_backend="webgl")
+    overlap_scatter = figure(**fargs, title="Overlap")
     overlap_scatter.xaxis.axis_label = 'Angle'
     overlap_scatter.yaxis.axis_label = '% Overlap'
-    overlap_scatter.scatter('Angle', '% Overlap', size=7, source=scatter,
-                            fill_color='red', color=mapper, alpha=0.6, nonselection_fill_color=mapper)
+    overlap_scatter.scatter('Angle', '% Overlap', **scargs)
 
-    comp_scatter = figure(plot_width=plots_width, plot_height=plots_height, tools='pan,wheel_zoom,box_zoom,reset,tap,save',
-                          title="Compactness", output_backend="webgl")
-    comp_scatter.xaxis.axis_label = 'Index'
-    comp_scatter.yaxis.axis_label = 'Compactness'
-    comp_scatter.scatter('index', 'Compactness', size=7, source=scatter,
-                         fill_color='red', color=mapper, alpha=0.6, nonselection_fill_color=mapper)
+    comp_scatter = figure(**fargs, title="Compactness")
+    comp_scatter.xaxis.axis_label = 'Creature length'
+    comp_scatter.yaxis.axis_label = 'Bounding box diagonal distance'
+    comp_scatter.scatter('Length', 'Compactness', **scargs)
 
-    centr_scatter = figure(plot_width=plots_width, plot_height=plots_height, tools='pan,wheel_zoom,box_zoom,reset,tap,save',
-                           title="Centroid location", output_backend="webgl")
+    centr_scatter = figure(**fargs, title="Centroid location")
     centr_scatter.xaxis.axis_label = 'X'
     centr_scatter.yaxis.axis_label = 'Y'
-    centr_scatter.scatter('Centroid'[0], 'Centroid'[1], size=7, source=scatter,
-                          fill_color='red', color=mapper, alpha=0.6, nonselection_fill_color=mapper)
+    centr_scatter.scatter('Centroid_X', 'Centroid_Y', **scargs)
+
+    comp_angle = figure(**fargs, title="Compactness")
+    comp_angle.xaxis.axis_label = 'Angle'
+    comp_angle.yaxis.axis_label = 'Bounding box diagonal distance'
+    comp_angle.scatter('Angle', 'Compactness', **scargs)
+
+    comp_char = figure(**fargs, title="Compactness")
+    comp_char.xaxis.axis_label = '% of char'
+    comp_char.yaxis.axis_label = 'Bounding box diagonal distance'
+    comp_char.scatter('% of +', 'Compactness', **scargs)
+    comp_char.scatter('% of -', 'Compactness', **scargs)
 
     """ Text
     -----------------------------------------------------------------------------------------------------
     """
     L_string = Paragraph(text='Select creature', width=1200)
-    characteristics = Div(text='Select creature', width=200)
-    grams = PreText(text='Select creature', width=400)
-    rule_text = PreText(text='Select creature', width=400)
+    characteristics = Div(text='Select creature', width=450)
+    grams_static = PreText(text='Select creature', width=450)
+    grams_rolling = PreText(text='Select creature', width=450)
 
     def to_coords(string, angle):
         """Converts L-string to coordinates
@@ -257,7 +285,6 @@ def modify_doc(doc):
             r_2_poly.data = dict(x=[0, 0], y=[0, 0])
             dist.data = dict(x=[0], F=[0], M=[0], P=[0])
             L_string.text = 'Select creature'
-            rule_text.text = 'Select creature'
             characteristics.text = 'Select creature'
 
         clear()
@@ -267,20 +294,28 @@ def modify_doc(doc):
             creature_index = scatter.selected.indices[0]
             creature = allData.iloc[creature_index, :]
             coords = creature['Coordinates']
-            # coords = np.array(ast.literal_eval(creature['Coordinates']))
+            rules = creature['Rules']
+            rules = rules['X']
+            probas = rules['probabilities']
+            rules = rules['options']
 
             L_string.text = '{}'.format(creature['L-string'])
 
             characteristics.text = 'Area:\t{:.2f}'.format(creature['Area']) + \
                 '</br>' + \
+                'Achievable creature area:\t{}'.format(creature['L-string'].count('F')+0.785) + \
+                '</br>' + \
+                'Overlap:\t{:.1%}'.format(1 - creature['Area'] / (creature['L-string'].count('F')+0.785)) + \
+                '</br>' + \
                 'Length of L-string:\t{}'.format(len(creature['L-string'])) + \
                 '</br>' + \
-                'Maximum string area:\t{}'.format(len(creature['L-string']) + 0.785) + \
-                '</br>' + \
-                'Maximum creature area:\t{}'.format(creature['L-string'].count('F')+0.785) + \
-                '</br>' + \
-                'Overlap:\t{:.1%}'.format(1 -
-                                          creature['Area'] / (creature['L-string'].count('F')+0.785))
+                'Achievable maxmimum area:\t{}'.format(
+                    len(creature['L-string']) + 0.785) + \
+                'Rule 1: \t{}'.format(rules[0]) + \
+                '\t Pr: \t{:.2%}'.format(probas[0]) + \
+                '\n' + \
+                'Rule 2: \t{}'.format(rules[1]) + \
+                '\t Pr: \t{:.2%}'.format(probas[1])
 
             gram_frame_1 = pd.DataFrame.from_dict(
                 {'2-gram': creature['2-gram'],
@@ -294,7 +329,22 @@ def modify_doc(doc):
                 str).apply(' '.join, 1) for i in gram_frame_1]
             out = pd.concat(counts, 1).fillna('')
             out.columns = gram_frame_1.columns
-            grams.text = str(
+            grams_static.text = ('-' * 14) + ' Static n-grams ' + ('-' * 14) + '\n' + str(
+                tabulate(out, headers='keys'))
+
+            gram_frame_2 = pd.DataFrame.from_dict(
+                {'2-gram': creature['Rolling n-gram'][0],
+                 '3-gram': creature['Rolling n-gram'][1],
+                 '4-gram': creature['Rolling n-gram'][2],
+                 '5-gram': creature['Rolling n-gram'][3],
+                 },
+                orient='index').T
+
+            counts = [pd.value_counts(gram_frame_2[i]).reset_index().astype(
+                str).apply(' '.join, 1) for i in gram_frame_1]
+            out = pd.concat(counts, 1).fillna('')
+            out.columns = gram_frame_1.columns
+            grams_rolling.text = ('-' * 14) + ' Rolling n-grams ' + ('-' * 14) + '\n' + str(
                 tabulate(out, headers='keys'))
 
             creature_linestring = LineString(coords[:, 0:2])
@@ -314,18 +364,6 @@ def modify_doc(doc):
 
             line.data = dict(x=coords[:, 0], y=coords[:, 1])
             polygon.data = dict(x=x_points, y=y_points)
-
-            # rules = ast.literal_eval(creature['Rules'])
-            rules = creature['Rules']
-            rules = rules['X']
-            probas = rules['probabilities']
-            rules = rules['options']
-
-            rule_text.text = 'Rule 1: \t{}'.format(rules[0]) + \
-                '\t Pr: \t{:.2%}'.format(probas[0]) + \
-                '\n' + \
-                'Rule 2: \t{}'.format(rules[1]) + \
-                '\t Pr: \t{:.2%}'.format(probas[1])
 
             if 'F' in rules[0]:
                 r_1_coords = to_coords(rules[0], creature['Angle'])
@@ -377,11 +415,13 @@ def modify_doc(doc):
     overlap_scatter.on_event(Tap, plot_creature)
     comp_scatter.on_event(Tap, plot_creature)
     centr_scatter.on_event(Tap, plot_creature)
+    comp_angle.on_event(Tap, plot_creature)
+    comp_char.on_event(Tap, plot_creature)
 
     row_A = row(L_string)
     row_B = row(per_scatter, seq_scatter, ang_scatter, overlap_scatter)
     row_C_right = column(rule_1_plot, rule_2_plot)
-    row_C_middle = column(grams, rule_text)
+    row_C_middle = row(grams_rolling, grams_static)
     row_C = row(
         characteristics,
         creature_plot,
@@ -390,13 +430,13 @@ def modify_doc(doc):
         Spacer(width=50),
         row_C_right)
     row_D = row(char_dist)
-    row_E = row(comp_scatter, centr_scatter)
+    row_E = row(comp_scatter, comp_angle, comp_char, centr_scatter)
 
     layout = column(
         row_A,
         row_B,
         row_C,
-        # row_D,
+        row_D,
         row_E,
     )
 
@@ -406,6 +446,14 @@ def modify_doc(doc):
 def main():
     """Launch bokeh server and connect to it
     """
+    print('\n' + ('-' * 100))
+    print('Preprocessing...')
+    print('-' * 100 + '\n')
+    global allData
+    allData = preProcessing()
+    print('\n' + ('-' * 100))
+    print('ALL DONE!')
+    print('-' * 100 + '\n')
 
     print("Preparing a bokeh application.")
     io_loop = IOLoop.current()
