@@ -1,6 +1,6 @@
 from bokeh.io import output_file, show, export_png, export_svgs, save
 from bokeh.plotting import figure, curdoc, reset_output
-from bokeh.models import ColumnDataSource, Label, Range1d
+from bokeh.models import ColumnDataSource, Label, Range1d, Select
 from bokeh.layouts import row, column, Spacer
 from bokeh.models.glyphs import Patch
 from bokeh.models.widgets import PreText, Paragraph, Div
@@ -31,6 +31,8 @@ from tabulate import tabulate
 import time
 import pickle
 from nltk.util import ngrams
+from itertools import groupby
+from sklearn.preprocessing import StandardScaler
 
 
 def preProcessing():
@@ -44,6 +46,7 @@ def preProcessing():
     allData.replace(np.inf, 0, inplace=True)
 
     allData.drop_duplicates(subset='L-string', inplace=True)
+    allData.reset_index(inplace=True)
     allData['Angle'] = allData['Angle'].apply(lambda x: x*(180/pi))
     overlap = []
     linestrings = []
@@ -55,9 +58,6 @@ def preProcessing():
 
     allData['Line Strings'] = linestrings
     allData['% Overlap'] = overlap
-    # cr = allData.iloc[1, :]
-    # a = cr['Line Strings'].centroid.x
-    # print(a)
     allData['Centroid_X'] = allData['Line Strings'].apply(
         lambda x: x.centroid.x)
     allData['Centroid_Y'] = allData['Line Strings'].apply(
@@ -66,18 +66,28 @@ def preProcessing():
         lambda x: np.linalg.norm(x))
     allData['Length'] = allData['Line Strings'].apply(
         lambda x: x.length)
+    
+    scaler = StandardScaler()
+    allData['S_Area'] = scaler.fit_transform(
+        allData['Area'].values.reshape(-1, 1))
 
-    allData['Rolling n-grams'] = allData['L-string'].apply(
-        lambda x: [[(''.join(tup)) for i in range(2, 6)
-                    for tup in list(ngrams(list(x), i))]]
-    )
+    ngram_list = allData['L-string'].apply(lambda x: ((''.join(tup))
+                                                      for i in range(2, 6) for tup in list(ngrams(list(x), i))))
+
+    gram = []
+    for ngram in ngram_list:
+        tmp = [[*v] for _, v in groupby(sorted(ngram, key=len), key=len)]
+        gram.append(tmp)
+
+    allData['Rolling n-grams'] = gram
+
+
     gc.collect()
 
     for i in range(2, 6):
         allData['{}-gram'.format(i)] = allData['L-string'].apply(lambda x: [x[j:j+i]
                                                                             for j in range(0, len(x), i)])
 
-    allData.reset_index()
     return allData
 
 
@@ -104,6 +114,10 @@ def modify_doc(doc):
     r_1_poly = ColumnDataSource(data=dict(x=[], y=[]))
     r_2_poly = ColumnDataSource(data=dict(x=[], y=[]))
     dist = ColumnDataSource(data=dict(x=[0], F=[0], P=[0], M=[0]))
+
+    hist, edges = np.histogram(allData['S_Area'].values, bins=int(allData.shape[0]/10))
+    dist_dict = ColumnDataSource(dict(
+        hist=hist, edges_left=edges[:-1], edges_right=edges[1:]))
 
     palette.reverse()
     mapper = log_cmap(
@@ -182,12 +196,23 @@ def modify_doc(doc):
     rule_2_plot.patch(x='x', y='y', source=r_2_poly)
     rule_2_plot.line(x='x', y='y', line_color='red', source=r_2)
 
-    char_dist = figure(plot_width=plot_width, plot_height=plot_height//2,
-                       title="Character distribution", output_backend="webgl"
-                       )
-    char_dist.varea_stack(['F', 'P', 'M'], x='x',
-                          color=brewer['Spectral'][3], legend=['F char', '+ char', '- char'], source=dist)
-    char_dist.xaxis.axis_label = 'L-string length'
+    char_F_dist = figure(plot_width=plot_width, plot_height=plot_height//2,
+                         title="F character distribution", output_backend="webgl"
+                         )
+    char_F_dist.varea_stack('F', x='x', source=dist)
+    char_F_dist.xaxis.axis_label = 'L-string length'
+
+    char_M_dist = figure(plot_width=plot_width, plot_height=plot_height//2,
+                         title="- character distribution", output_backend="webgl"
+                         )
+    char_M_dist.varea_stack('M', x='x', source=dist)
+    char_M_dist.xaxis.axis_label = 'L-string length'
+
+    char_P_dist = figure(plot_width=plot_width, plot_height=plot_height//2,
+                         title="+ character distribution", output_backend="webgl"
+                         )
+    char_P_dist.varea_stack('P', x='x', source=dist)
+    char_P_dist.xaxis.axis_label = 'L-string length'
 
     overlap_scatter = figure(**fargs, title="Overlap")
     overlap_scatter.xaxis.axis_label = 'Angle'
@@ -202,7 +227,8 @@ def modify_doc(doc):
     centr_scatter = figure(**fargs, title="Centroid location")
     centr_scatter.xaxis.axis_label = 'X'
     centr_scatter.yaxis.axis_label = 'Y'
-    centr_scatter.scatter('Centroid_X', 'Centroid_Y', **scargs)
+    centr_scatter.scatter('Centroid_X', 'Centroid_Y',
+                          radius='S_Area', **scargs)
 
     comp_angle = figure(**fargs, title="Compactness")
     comp_angle.xaxis.axis_label = 'Angle'
@@ -215,6 +241,24 @@ def modify_doc(doc):
     comp_char.scatter('% of +', 'Compactness', **scargs)
     comp_char.scatter('% of -', 'Compactness', **scargs)
 
+    comp_area = figure(**fargs, title="Compactness")
+    comp_area.xaxis.axis_label = 'Area'
+    comp_area.yaxis.axis_label = 'Bounding box diagonal distance'
+    comp_area.scatter('Area', 'Compactness', **scargs)
+
+    dist_plot = figure(plot_width=plot_width*3,
+                       plot_height=plot_height,
+                       title="Distributions",
+                       output_backend="webgl",
+                       x_axis_label='Select metric',
+                       y_axis_label='Creatures'
+                       )
+    dist_select = Select(value=' ', title='Metric',
+                         options=list(allData.select_dtypes(include=[np.number]).columns[1:].values))
+    dist_plot.quad(top='hist', bottom=0, left='edges_left', right='edges_right',
+                   fill_color="navy", line_color="white", alpha=0.5, source=dist_dict)
+
+
     """ Text
     -----------------------------------------------------------------------------------------------------
     """
@@ -222,6 +266,19 @@ def modify_doc(doc):
     characteristics = Div(text='Select creature', width=450)
     grams_static = PreText(text='Select creature', width=450)
     grams_rolling = PreText(text='Select creature', width=450)
+
+    def clear():
+            line.data = dict(x=[0, 0], y=[0, 0])
+            polygon.data = dict(x=[0, 0], y=[0, 0])
+            r_1.data = dict(x=[0, 0], y=[0, 0])
+            r_2.data = dict(x=[0, 0], y=[0, 0])
+            r_1_poly.data = dict(x=[0, 0], y=[0, 0])
+            r_2_poly.data = dict(x=[0, 0], y=[0, 0])
+            dist.data = dict(x=[0], F=[0], M=[0], P=[0])
+            L_string.text = 'Select creature'
+            characteristics.text = 'Select creature'
+            grams_static.text = 'Select creature'
+            grams_rolling.text = 'Select creature'
 
     def to_coords(string, angle):
         """Converts L-string to coordinates
@@ -276,17 +333,6 @@ def modify_doc(doc):
             On Tap event registered by Bokeh
         """
 
-        def clear():
-            line.data = dict(x=[0, 0], y=[0, 0])
-            polygon.data = dict(x=[0, 0], y=[0, 0])
-            r_1.data = dict(x=[0, 0], y=[0, 0])
-            r_2.data = dict(x=[0, 0], y=[0, 0])
-            r_1_poly.data = dict(x=[0, 0], y=[0, 0])
-            r_2_poly.data = dict(x=[0, 0], y=[0, 0])
-            dist.data = dict(x=[0], F=[0], M=[0], P=[0])
-            L_string.text = 'Select creature'
-            characteristics.text = 'Select creature'
-
         clear()
 
         if len(scatter.selected.indices) > 0:
@@ -311,11 +357,16 @@ def modify_doc(doc):
                 '</br>' + \
                 'Achievable maxmimum area:\t{}'.format(
                     len(creature['L-string']) + 0.785) + \
-                'Rule 1: \t{}'.format(rules[0]) + \
-                '\t Pr: \t{:.2%}'.format(probas[0]) + \
-                '\n' + \
-                'Rule 2: \t{}'.format(rules[1]) + \
-                '\t Pr: \t{:.2%}'.format(probas[1])
+                '</br>' + \
+                'Rule 1: <i><tab>{}</i>'.format(rules[0]) + \
+                '<tab><tab> Pr: <tab>{:.2%}'.format(probas[0]) + \
+                '</br>' + \
+                'Rule 2: <i><tab>{}</i>'.format(rules[1]) + \
+                '<tab><tab> Pr: <tab>{:.2%}'.format(probas[1]) + \
+                '</br>' + \
+                'Thinness ratio: <tab>{}'.format(
+                    4 * pi * creature['Line Strings'].convex_hull.area/(creature['Line Strings'].length**2)
+                )
 
             gram_frame_1 = pd.DataFrame.from_dict(
                 {'2-gram': creature['2-gram'],
@@ -333,10 +384,10 @@ def modify_doc(doc):
                 tabulate(out, headers='keys'))
 
             gram_frame_2 = pd.DataFrame.from_dict(
-                {'2-gram': creature['Rolling n-gram'][0],
-                 '3-gram': creature['Rolling n-gram'][1],
-                 '4-gram': creature['Rolling n-gram'][2],
-                 '5-gram': creature['Rolling n-gram'][3],
+                {'2-gram': creature['Rolling n-grams'][0],
+                 '3-gram': creature['Rolling n-grams'][1],
+                 '4-gram': creature['Rolling n-grams'][2],
+                 '5-gram': creature['Rolling n-grams'][3],
                  },
                 orient='index').T
 
@@ -388,8 +439,8 @@ def modify_doc(doc):
                 r_2.data = dict(x=r_2_coords[:, 0], y=r_2_coords[:, 1])
 
             c_string = creature['L-string']
-            bins_width = 25
-            bins = len(c_string)//bins_width
+            bins_width = 10
+            bins = int(len(c_string)//bins_width)
             dists = {}
             dists['F'] = []
             dists['P'] = []
@@ -404,10 +455,19 @@ def modify_doc(doc):
                 dists['M'].append(c_string.count('-', start, end))
             [dists['x'].append(i) for i in range(1, bins+1)]
             dist.data = dists
-            char_dist.x_range = Range1d(-1, (bins+15))
 
         else:
             clear()
+
+    def update_dist(attrname, old, new):
+        scaler = StandardScaler()
+        name = dist_select.value
+        hist, edges = np.histogram(
+            scaler.fit_transform(
+                allData[name].values.reshape(-1, 1)), bins=int(allData.shape[0]/10))
+        dist_dict.data = dict(
+            hist=hist, edges_left=edges[:-1], edges_right=edges[1:])
+        dist_plot.xaxis.axis_label = name
 
     per_scatter.on_event(Tap, plot_creature)
     seq_scatter.on_event(Tap, plot_creature)
@@ -417,6 +477,8 @@ def modify_doc(doc):
     centr_scatter.on_event(Tap, plot_creature)
     comp_angle.on_event(Tap, plot_creature)
     comp_char.on_event(Tap, plot_creature)
+    comp_area.on_event(Tap, plot_creature)
+    dist_select.on_change('value', update_dist)
 
     row_A = row(L_string)
     row_B = row(per_scatter, seq_scatter, ang_scatter, overlap_scatter)
@@ -429,8 +491,10 @@ def modify_doc(doc):
         row_C_middle,
         Spacer(width=50),
         row_C_right)
-    row_D = row(char_dist)
+    row_D = row(char_F_dist, char_M_dist, char_P_dist)
     row_E = row(comp_scatter, comp_angle, comp_char, centr_scatter)
+    row_F = row(comp_area)
+    row_G = column(dist_select, dist_plot)
 
     layout = column(
         row_A,
@@ -438,8 +502,11 @@ def modify_doc(doc):
         row_C,
         row_D,
         row_E,
+        row_F,
+        row_G,
     )
-
+    
+    clear()
     doc.add_root(layout)
 
 
