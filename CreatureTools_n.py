@@ -32,13 +32,18 @@ class Creature:
             {"A": "AB",
             "B": "A"}
         """
-        self.rules = params.get('rules')
-        self.l_string = params.get('axiom')
-        self.constants = params.get('constants')
-        self.variables = params.get('variables')
-        self.angle = radians(params.get('angle'))
-        self.recur(params.get('num_char'))
+        if not 'L-string' in params:
+            self.rules = params.get('rules')
+            self.l_string = params.get('axiom')
+            self.constants = params.get('constants')
+            self.variables = params.get('variables')
+            self.recur(params.get('num_char'))
+
+        else:
+            self.l_string = params.get('L-string')
+
         self.length = params.get('length')
+        self.angle = radians(params.get('angle'))
         self.mapper()
         self.layout()
         self.results()

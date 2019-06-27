@@ -42,6 +42,7 @@ def preProcessing():
 
     allData = pickle.load(open(filepath, 'rb'))
 
+    allData = pd.DataFrame(allData[1:], columns=allData[0])
     allData.fillna(0, inplace=True)
     allData.replace(np.inf, 0, inplace=True)
 
@@ -340,33 +341,45 @@ def modify_doc(doc):
             creature_index = scatter.selected.indices[0]
             creature = allData.iloc[creature_index, :]
             coords = creature['Coordinates']
-            rules = creature['Rules']
-            rules = rules['X']
-            probas = rules['probabilities']
-            rules = rules['options']
+            try:
+                rules = creature['Rules']
+                rules = rules['X']
+                probas = rules['probabilities']
+                rules = rules['options']
+                
+                characteristics.text = 'Area:\t{:.2f}'.format(creature['Area']) + \
+                    '</br>' + \
+                    'Achievable creature area:\t{}'.format(creature['L-string'].count('F')+0.785) + \
+                    '</br>' + \
+                    'Overlap:\t{:.1%}'.format(1 - creature['Area'] / (creature['L-string'].count('F')+0.785)) + \
+                    '</br>' + \
+                    'Length of L-string:\t{}'.format(len(creature['L-string'])) + \
+                    '</br>' + \
+                    'Achievable maxmimum area:\t{}'.format(
+                        len(creature['L-string']) + 0.785) + \
+                    '</br>' + \
+                    'Rule 1: <i><tab>{}</i>'.format(rules[0]) + \
+                    '<tab><tab> Pr: <tab>{:.2%}'.format(probas[0]) + \
+                    '</br>' + \
+                    'Rule 2: <i><tab>{}</i>'.format(rules[1]) + \
+                    '<tab><tab> Pr: <tab>{:.2%}'.format(probas[1])
+
+            except:
+                characteristics.text = 'Area:\t{:.2f}'.format(creature['Area']) + \
+                    '</br>' + \
+                    'Achievable creature area:\t{}'.format(creature['L-string'].count('F')+0.785) + \
+                    '</br>' + \
+                    'Overlap:\t{:.1%}'.format(1 - creature['Area'] / (creature['L-string'].count('F')+0.785)) + \
+                    '</br>' + \
+                    'Length of L-string:\t{}'.format(len(creature['L-string'])) + \
+                    '</br>' + \
+                    'Achievable maxmimum area:\t{}'.format(
+                        len(creature['L-string']) + 0.785)
+
 
             L_string.text = '{}'.format(creature['L-string'])
 
-            characteristics.text = 'Area:\t{:.2f}'.format(creature['Area']) + \
-                '</br>' + \
-                'Achievable creature area:\t{}'.format(creature['L-string'].count('F')+0.785) + \
-                '</br>' + \
-                'Overlap:\t{:.1%}'.format(1 - creature['Area'] / (creature['L-string'].count('F')+0.785)) + \
-                '</br>' + \
-                'Length of L-string:\t{}'.format(len(creature['L-string'])) + \
-                '</br>' + \
-                'Achievable maxmimum area:\t{}'.format(
-                    len(creature['L-string']) + 0.785) + \
-                '</br>' + \
-                'Rule 1: <i><tab>{}</i>'.format(rules[0]) + \
-                '<tab><tab> Pr: <tab>{:.2%}'.format(probas[0]) + \
-                '</br>' + \
-                'Rule 2: <i><tab>{}</i>'.format(rules[1]) + \
-                '<tab><tab> Pr: <tab>{:.2%}'.format(probas[1]) + \
-                '</br>' + \
-                'Thinness ratio: <tab>{}'.format(
-                    4 * pi * creature['Line Strings'].convex_hull.area/(creature['Line Strings'].length**2)
-                )
+            
 
             gram_frame_1 = pd.DataFrame.from_dict(
                 {'2-gram': creature['2-gram'],
