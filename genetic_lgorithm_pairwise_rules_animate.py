@@ -1,33 +1,44 @@
-from CreatureTools_3 import Creature
-import numpy as np
 import multiprocessing as mp
 import os
-import pandas as pd
-from datetime import datetime
+import pickle
+import random
 import sys
 import time
-import pickle
-from itertools import chain
-import random
+from datetime import datetime
+from functools import partial
+from itertools import chain, repeat
 from math import ceil
-import matplotlib.pyplot as plt
-from tabulate import tabulate
-import bisect
+import curses
 
-def genPop():
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+import numpy as np
+import pandas as pd
+import tqdm
+from tabulate import tabulate
+
+from CreatureTools_3 import Creature
+
+def genPop(params, predef_rules=None):
     
     np.random.seed()
 
-    choices = [ 'F',
-                '+',
-                '-',
-                'X',
-                ]
-    rule_A = ''.join([np.random.choice(choices)
-                    for _ in range(5)])
-    rule_B = ''.join([np.random.choice(choices)
-                    for _ in range(5)])
-    params['rules'] = {'X': { 1: rule_A, 2:rule_B}}
+    if not predef_rules:
+        choices = [ 'F',
+                    '+',
+                    '-',
+                    'X',
+                    ]
+        rule_A = ''.join([np.random.choice(choices)
+                        for _ in range(5)])
+        rule_B = ''.join([np.random.choice(choices)
+                        for _ in range(5)])
+        params['rules'] = {'X': { 1: rule_A, 2:rule_B}}
+    else:
+        params['rules'] = {'X': { 
+            1: predef_rules[0], 
+            2: predef_rules[1]
+            }}
 
     c = Creature(params)
     a = (
@@ -39,7 +50,6 @@ def genPop():
 
     return list(a)
 
-
 def progress(count, total, status=''):
     bar_len = 60
     filled_len = int(round(bar_len * count / float(total)))
@@ -48,7 +58,6 @@ def progress(count, total, status=''):
     bar = '=' * filled_len + '-' * (bar_len - filled_len)
 
     sys.stdout.write('[%s] %s%s ...%s\r' % (bar, percents, '%', status))
-
 
 def firstRun(iter):
     population = []
@@ -59,36 +68,11 @@ def firstRun(iter):
         'Rule ratio',
     ]]
 
-    # params = {
-    #     'chars': 100,
-    #     'variables': 'X',
-    #     'constants': 'F+-',
-    #     'axiom': 'FX',
-    #     'length': 1.0,
-    #     'angle': 25
-    # }
-    
-    for i in range(iter):
-        progress(i, iter, status='Create initial population')
-
-        np.random.seed()
-
-        population.append(genPop())
-
-    # with mp.Pool() as pool:
-
-    #     for i in range(iter):
-    #         progress(i, iter, status='Create initial population')
-
-    #         np.random.seed()
-
-    #         results = pool.apply_async(genPop, args=(params,))
-    #         population.append(results.get())
-
-    # pool.join()
+    with mp.Pool(num_cores) as pool:
+        result = list(tqdm.tqdm(pool.imap(genPop, repeat(params, iter)), total=iter))
+        population = population + result  
 
     return population
-
 
 def selection(population):
 
@@ -141,45 +125,64 @@ def selection(population):
 
     """ CROSSOVER """
     while len(next_gen) < total:
-        parent_1_A, parent_1_B  = np.random.choice(population, p=probabilities)
-        parent_2_A, parent_2_B  = np.random.choice(population, p=probabilities)
-        index = np.random.randint(0, len(parent1))
-        child = parent1[:index] + parent2[index:]
-        next_gen.append(child)
+        parent_1_A, parent_1_B  = population.iloc[np.random.choice(population.index, p=probabilities), 0:2]
+        parent_2_A, parent_2_B  = population.iloc[np.random.choice(population.index, p=probabilities), 0:2]
+        index_1 = np.random.randint(0, len(parent_1_A))
+        index_2 = np.random.randint(0, len(parent_2_A))
+        child_1 = parent_1_A[:index_1] + parent_2_A[index_1:]
+        child_2 = parent_1_B[:index_2] + parent_2_B[index_2:]
+        next_gen.append([
+            child_1, child_2
+        ])
 
     return next_gen
 
-    # tmp = []
-    # for crt in next_gen:
-    #     param = {
-    #         'L-string': crt,
-    #         'length': 1.0,
-    #         'angle': 45
-    #     }
-    #     c = Creature(param)
-    #     a = (
-    #         c.l_string,
-    #         c.coords,
-    #         c.area,
-    #     )
-    #     tmp.append(a)
+def plotter(frame, line):
+    line.set_data(best_area)
+    return line,
 
-    # return tmp
-
+def plotting(fig, line):
+    ani = FuncAnimation(fig, plotter, fargs=(line,), interval=100, blit=True)
+    plt.show()
 
 if __name__ == "__main__":
+    
+    manager = mp.Manager()
 
-    global params
+    global params, num_cores
+    
+    best_area = manager.Array('f', [2,1])
+    
+    num_cores = mp.cpu_count() - 2
+
+    # best_area = np.zeros((2,1))
+
+    fig, ax = plt.subplots()
+    ax.set_xlabel('Generation')
+    ax.set_ylabel('Best area')
+    ax.grid()
+    temp = best_area.acquire()
+    line, = plt.plot(best_area[0], best_area[1], 'r-')
+
+    plot_proc = mp.Process(target=plotting, args=(fig,line,))
+    plot_proc.start()
+    
+
     params = {
-        'chars': 100,
+        'chars': 500,
+        'recurs': 100,
         'variables': 'X',
         'constants': 'F+-',
         'axiom': 'FX',
         'length': 1.0,
-        'angle': 25
-    }
+        'angle': 25,
+        'prune': False,
+    }   
 
     pop_size = [100]
+
+    # for i in range(5):
+    #     genPop(params)
 
     for pop in pop_size:
         population = firstRun(pop)
@@ -198,86 +201,66 @@ if __name__ == "__main__":
 
         sys.stdout.write('Done! \n')
         
-        max_area = params.get('chars')
+        max_area = len(population.iloc[0, 0]) + 0.785
 
         i = 0
-
-        best_area = []
-        plt.ion()
-
+        
         gens = [list(population.columns)]
 
-        while population.iloc[0, 1] < max_area:
+        stdscr = curses.initscr()
+        stdscr.refresh()
 
-            def newGen(crt):
-                param = {
-                    'L-string': crt,
-                    'length': 1.0,
-                    'angle': 45
-                }
-                c = Creature(param)
-                a = (
-                    c.l_string,
-                    c.coords,
-                    c.area,
-                )
-                tmp.append(a)
-
-                return tmp
+        while population.iloc[0, 1] < 5000: #max_area:
+            
+            stdscr.addstr(0, 0, 'Iteration: {}\r'.format(i))
+            stdscr.refresh()
 
             result_list = []
 
             gens.append(list(population.iloc[0, :]))
 
-            # rule_list = list(rule_frame)
-
-            # num_cores = 6
-            # num_partitions = 10
-            # splits = np.split(populations, num_partitions)
-            # with mp.Pool(num_cores) as pool:
-            #     result = pool.map(selection, splits)
-            #     result_list.append(result)
-
-            # pool.join()
-
-            # result_list = selection(rule_list)
             new_gen = selection(rule_frame)
 
             with mp.Pool(num_cores) as pool:
-                result = pool.map(newGen, new_gen)
-                result_list.append(result)
-
+                func = partial(genPop, params)
+                """ WITH PROGRESSBARS """
+                # result = list(tqdm.tqdm(pool.imap_unordered(func, new_gen), total=len(new_gen), file=sys.stdout))
+                """ WITHOUT PROGRESSBARS """
+                # sys.stdout.write('\nBusy...\r')
+                stdscr.addstr(1, 0, 'Busy...')
+                stdscr.refresh()
+                result = list(pool.imap_unordered(func, new_gen))
+                stdscr.addstr(1, 0, 'Done')
+                stdscr.refresh()
+                
             pool.join()
 
-            # unpacked_results = list(chain(*result_list[0]))
+            population.iloc[:, :] = result
 
-            # populations.iloc[:, :] = unpacked_results
-
-            population.iloc[:, :] = result_list
-
-            sys.stdout.write('Iteration: {}\r'.format(i))
+            # sys.stdout.write('Iteration: {}\r'.format(i))
+            # sys.stdout.write(tabulate(population.head(1), headers='keys'))
 
             population.sort_values(
                 by=['Area'], ascending=False, inplace=True)
 
-            best_area.append(population.iloc[0, 2])
-
-            plt.clf()
-            plt.plot(best_area)
-            plt.xlabel('Generation')
-            plt.ylabel('Best area')
-            plt.grid()
-
-            plt.pause(0.01)
+            best_area = np.hstack((best_area, np.array([[i], [population.iloc[0, 1]]])))
+            
+            # line.set_data(best_area)
+            # fig.canvas.draw()
+            # fig.canvas.flush_events()
+            # plt.clf()
+            # plt.plot(best_area)
+            # plt.xlabel('Generation')
+            # plt.ylabel('Best area')
+            # plt.grid()
+            # plt.pause(0.0001)
 
             i += 1
 
-        gens = pd.DataFrame(gens[1:], columns=gens[0])
+        curses.endwin()
+        sys.stdout.write('Maximum area achieved!')
 
-        # if i == 1000:
-        #     sys.stdout.write('\nMaximum iterations reached \n')
-        # else:
-        #     sys.stdout.write('\nMaximum area achieved \n')
+        gens = pd.DataFrame(gens[1:], columns=gens[0])
 
         curr_dir = os.path.dirname(__file__)
 

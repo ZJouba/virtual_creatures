@@ -32,7 +32,7 @@ import time
 import pickle
 from nltk.util import ngrams
 from itertools import groupby
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 
 def preProcessing():
@@ -42,7 +42,13 @@ def preProcessing():
 
     allData = pickle.load(open(filepath, 'rb'))
 
-    allData = pd.DataFrame(allData[1:], columns=allData[0])
+    print('\n' + ('-' * 100))
+    print('Preprocessing...')
+    print('-' * 100 + '\n')
+
+    if not isinstance(allData, pd.DataFrame):
+        allData = pd.DataFrame(allData[1:], columns=allData[0])
+
     allData.fillna(0, inplace=True)
     allData.replace(np.inf, 0, inplace=True)
 
@@ -67,8 +73,8 @@ def preProcessing():
         lambda x: np.linalg.norm(x))
     allData['Length'] = allData['Line Strings'].apply(
         lambda x: x.length)
-    
-    scaler = StandardScaler()
+
+    scaler = MinMaxScaler(feature_range=(0, 10))
     allData['S_Area'] = scaler.fit_transform(
         allData['Area'].values.reshape(-1, 1))
 
@@ -82,12 +88,13 @@ def preProcessing():
 
     allData['Rolling n-grams'] = gram
 
-
     gc.collect()
 
     for i in range(2, 6):
         allData['{}-gram'.format(i)] = allData['L-string'].apply(lambda x: [x[j:j+i]
                                                                             for j in range(0, len(x), i)])
+
+    allData.to_csv("frameCSV.csv")
 
     return allData
 
@@ -116,7 +123,8 @@ def modify_doc(doc):
     r_2_poly = ColumnDataSource(data=dict(x=[], y=[]))
     dist = ColumnDataSource(data=dict(x=[0], F=[0], P=[0], M=[0]))
 
-    hist, edges = np.histogram(allData['S_Area'].values, bins=int(allData.shape[0]/10))
+    hist, edges = np.histogram(
+        allData['S_Area'].values, bins=int(allData.shape[0]/10))
     dist_dict = ColumnDataSource(dict(
         hist=hist, edges_left=edges[:-1], edges_right=edges[1:]))
 
@@ -259,7 +267,6 @@ def modify_doc(doc):
     dist_plot.quad(top='hist', bottom=0, left='edges_left', right='edges_right',
                    fill_color="navy", line_color="white", alpha=0.5, source=dist_dict)
 
-
     """ Text
     -----------------------------------------------------------------------------------------------------
     """
@@ -269,17 +276,17 @@ def modify_doc(doc):
     grams_rolling = PreText(text='Select creature', width=450)
 
     def clear():
-            line.data = dict(x=[0, 0], y=[0, 0])
-            polygon.data = dict(x=[0, 0], y=[0, 0])
-            r_1.data = dict(x=[0, 0], y=[0, 0])
-            r_2.data = dict(x=[0, 0], y=[0, 0])
-            r_1_poly.data = dict(x=[0, 0], y=[0, 0])
-            r_2_poly.data = dict(x=[0, 0], y=[0, 0])
-            dist.data = dict(x=[0], F=[0], M=[0], P=[0])
-            L_string.text = 'Select creature'
-            characteristics.text = 'Select creature'
-            grams_static.text = 'Select creature'
-            grams_rolling.text = 'Select creature'
+        line.data = dict(x=[0, 0], y=[0, 0])
+        polygon.data = dict(x=[0, 0], y=[0, 0])
+        r_1.data = dict(x=[0, 0], y=[0, 0])
+        r_2.data = dict(x=[0, 0], y=[0, 0])
+        r_1_poly.data = dict(x=[0, 0], y=[0, 0])
+        r_2_poly.data = dict(x=[0, 0], y=[0, 0])
+        dist.data = dict(x=[0], F=[0], M=[0], P=[0])
+        L_string.text = 'Select creature'
+        characteristics.text = 'Select creature'
+        grams_static.text = 'Select creature'
+        grams_rolling.text = 'Select creature'
 
     def to_coords(string, angle):
         """Converts L-string to coordinates
@@ -346,7 +353,7 @@ def modify_doc(doc):
                 rules = rules['X']
                 probas = rules['probabilities']
                 rules = rules['options']
-                
+
                 characteristics.text = 'Area:\t{:.2f}'.format(creature['Area']) + \
                     '</br>' + \
                     'Achievable creature area:\t{}'.format(creature['L-string'].count('F')+0.785) + \
@@ -376,10 +383,7 @@ def modify_doc(doc):
                     'Achievable maxmimum area:\t{}'.format(
                         len(creature['L-string']) + 0.785)
 
-
             L_string.text = '{}'.format(creature['L-string'])
-
-            
 
             gram_frame_1 = pd.DataFrame.from_dict(
                 {'2-gram': creature['2-gram'],
@@ -412,7 +416,7 @@ def modify_doc(doc):
                 tabulate(out, headers='keys'))
 
             creature_linestring = LineString(coords[:, 0:2])
-            creature_patch = creature_linestring.buffer(0.5)
+            creature_patch = creature_linestring.buffer(0.4999999)
             patch_x, patch_y = creature_patch.exterior.coords.xy
 
             x_points = [list(patch_x)]
@@ -518,7 +522,7 @@ def modify_doc(doc):
         row_F,
         row_G,
     )
-    
+
     clear()
     doc.add_root(layout)
 
@@ -527,7 +531,7 @@ def main():
     """Launch bokeh server and connect to it
     """
     print('\n' + ('-' * 100))
-    print('Preprocessing...')
+    print('Select file...')
     print('-' * 100 + '\n')
     global allData
     allData = preProcessing()

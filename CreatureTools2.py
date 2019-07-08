@@ -32,16 +32,20 @@ class Creature:
             {"A": "AB",
             "B": "A"}
         """
-        self.rules = params.get('rules')
-        self.l_string = params.get('axiom')
-        self.constants = params.get('constants')
-        self.variables = params.get('variables')
-        self.angle = radians(params.get('angle'))
-        self.recur(params.get('num_char'))
+        if not 'L-string' in params:
+            self.rules = params.get('rules')
+            self.l_string = params.get('axiom')
+            self.constants = params.get('constants')
+            self.variables = params.get('variables')
+            self.recur(params.get('num_char'))
+
+        else:
+            self.l_string = params.get('L-string')
+
         self.length = params.get('length')
+        self.angle = radians(params.get('angle'))
         self.mapper()
         self.layout()
-        self.results()
 
     def recur(self, n):
         for _ in range(n):
@@ -96,43 +100,5 @@ class Creature:
 
     def layout(self):
         self.linestring = LineString(self.coords[:, :2])
-        self.area = self.linestring.buffer(self.length/2).area
+        self.area = self.linestring.buffer(0.499999).area
         self.bounds = self.linestring.bounds
-
-    def results(self):
-        chars = set(list(self.l_string))
-        avgs = dict()
-
-        for i in chars:
-            avgs[i] = re.findall(
-                '(?<=' + re.escape(i) + ').*?(?=' + re.escape(i) + ')', self.l_string)
-
-        for i in chars:
-            if len(avgs[i]) == 0:
-                avgs[i] = 0.0
-            else:
-                avgs[i] = sum([len(i) for i in avgs[i]])/len(avgs[i])
-        try:
-            maxF = max(len(s) for s in re.findall(r'F+', self.l_string))
-        except:
-            maxF = 0
-
-        try:
-            maxP = max(len(s) for s in re.findall(r'[+]+', self.l_string))
-        except:
-            maxP = 0
-
-        try:
-            maxM = max(len(s) for s in re.findall(r'[-]+', self.l_string))
-        except:
-            maxM = 0
-
-        self.perF = self.l_string.count('F')/len(self.l_string)
-        self.perP = self.l_string.count('+')/len(self.l_string)
-        self.perM = self.l_string.count('-')/len(self.l_string)
-        self.maxF = maxF
-        self.maxP = maxP
-        self.maxM = maxM
-        self.avgF = avgs.get('F')
-        self.avgP = avgs.get('+')
-        self.avgM = avgs.get('-')
