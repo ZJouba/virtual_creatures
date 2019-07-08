@@ -267,3 +267,7 @@ if __name__ == "__main__":
         
         pickle.dump(gens, open(file_name, 'wb'))
         pickle.dump(population, open(file1_name, 'wb'))
+        gens.to_csv(os.path.join(
+            curr_dir, 'CSVs/generations ' + now + '.csv'))
+        population.to_csv(os.path.join(
+            curr_dir, 'CSVs/final_pop ' + now + '.csv'))
