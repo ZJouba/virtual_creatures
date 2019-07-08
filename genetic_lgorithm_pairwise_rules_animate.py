@@ -137,34 +137,38 @@ def selection(population):
 
     return next_gen
 
-def plotter(frame, line):
-    line.set_data(best_area)
+def plotter(frame, line, best_area):
+    value_arr = np.asarray(best_area).T
+    line.set_data(value_arr)
+    fig = plt.gcf()
+    ax = fig.axes[0]
+    ax.relim()
+    ax.autoscale()
     return line,
 
-def plotting(fig, line):
-    ani = FuncAnimation(fig, plotter, fargs=(line,), interval=100, blit=True)
+def plotting(fig, line, best_area):
+    ani = FuncAnimation(fig, plotter, fargs=(line, best_area, ), interval=200)
     plt.show()
 
 if __name__ == "__main__":
+
+    curr_dir = os.path.dirname(__file__)
     
     manager = mp.Manager()
 
     global params, num_cores
     
-    best_area = manager.Array('f', [2,1])
+    best_area = manager.list([[0,0]])
     
     num_cores = mp.cpu_count() - 2
-
-    # best_area = np.zeros((2,1))
 
     fig, ax = plt.subplots()
     ax.set_xlabel('Generation')
     ax.set_ylabel('Best area')
     ax.grid()
-    temp = best_area.acquire()
-    line, = plt.plot(best_area[0], best_area[1], 'r-')
+    line, = plt.plot(best_area[0][0], best_area[0][1], 'r-')
 
-    plot_proc = mp.Process(target=plotting, args=(fig,line,))
+    plot_proc = mp.Process(target=plotting, args=(fig,line,best_area,))
     plot_proc.start()
     
 
@@ -176,13 +180,10 @@ if __name__ == "__main__":
         'axiom': 'FX',
         'length': 1.0,
         'angle': 25,
-        'prune': False,
+        'prune': True,
     }   
 
     pop_size = [100]
-
-    # for i in range(5):
-    #     genPop(params)
 
     for pop in pop_size:
         population = firstRun(pop)
@@ -201,23 +202,22 @@ if __name__ == "__main__":
 
         sys.stdout.write('Done! \n')
         
-        max_area = len(population.iloc[0, 0]) + 0.785
+        max_area = len(population.iloc[0, 0])
 
         i = 0
         
         gens = [list(population.columns)]
+        gens.append(list(population.iloc[0, :]))
 
         stdscr = curses.initscr()
         stdscr.refresh()
 
-        while population.iloc[0, 1] < 5000: #max_area:
+        while population.iloc[0, 1] < max_area:
             
             stdscr.addstr(0, 0, 'Iteration: {}\r'.format(i))
             stdscr.refresh()
 
             result_list = []
-
-            gens.append(list(population.iloc[0, :]))
 
             new_gen = selection(rule_frame)
 
@@ -237,41 +237,33 @@ if __name__ == "__main__":
 
             population.iloc[:, :] = result
 
-            # sys.stdout.write('Iteration: {}\r'.format(i))
-            # sys.stdout.write(tabulate(population.head(1), headers='keys'))
-
             population.sort_values(
                 by=['Area'], ascending=False, inplace=True)
 
-            best_area = np.hstack((best_area, np.array([[i], [population.iloc[0, 1]]])))
-            
-            # line.set_data(best_area)
-            # fig.canvas.draw()
-            # fig.canvas.flush_events()
-            # plt.clf()
-            # plt.plot(best_area)
-            # plt.xlabel('Generation')
-            # plt.ylabel('Best area')
-            # plt.grid()
-            # plt.pause(0.0001)
+            best_area.append([i+1, population.iloc[0, 1]])
+
+            gens.append(list(population.iloc[0, :]))
 
             i += 1
 
         curses.endwin()
         sys.stdout.write('Maximum area achieved!')
+        
+        pic_name = os.path.join(
+            curr_dir, 'CSVs/plot_iterations=' + str(i) + 'pop=' + str(pop))
+        
+        plt.savefig(pic_name)
+        plt.close()
+        plot_proc.join()
 
         gens = pd.DataFrame(gens[1:], columns=gens[0])
 
-        curr_dir = os.path.dirname(__file__)
-
+        
         now = datetime.utcnow().strftime('%b %d, %Y @ %H.%M')
         file_name = os.path.join(
             curr_dir, 'CSVs/genetic_lgorithm ' + now + '.p')
         file1_name = os.path.join(
             curr_dir, 'CSVs/genetic_lgorithm_genframe ' + now + '.p')
-        pic_name = os.path.join(
-            curr_dir, 'CSVs/plot_iterations=' + str(i) + 'pop=' + str(pop))
-
-        plt.savefig(pic_name)
+        
         pickle.dump(gens, open(file_name, 'wb'))
         pickle.dump(population, open(file1_name, 'wb'))

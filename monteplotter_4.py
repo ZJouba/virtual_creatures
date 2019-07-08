@@ -54,7 +54,10 @@ def preProcessing():
 
     allData.drop_duplicates(subset='L-string', inplace=True)
     allData.reset_index(inplace=True)
-    allData['Angle'] = allData['Angle'].apply(lambda x: x*(180/pi))
+    try:
+        allData['Angle'] = allData['Angle'].apply(lambda x: x*(180/pi))
+    except:
+        pass
     overlap = []
     linestrings = []
     for _, creature in allData.iterrows():
