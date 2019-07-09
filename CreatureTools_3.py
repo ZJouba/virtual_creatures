@@ -57,11 +57,12 @@ class Creature:
                 break
             else:
                 self.l_string = ''.join([self.next_char(c) for c in self.l_string])
-        self.l_string = self.l_string.replace('X', '')
         
         if self.prune:
             if len(self.l_string) > self.chars:
                 self.l_string = self.l_string[:500]
+
+        # self.l_string = self.l_string.replace('X', '')
         
     def next_char(self, c):
         rule = self.rules.get(c, c)

@@ -4,7 +4,7 @@ import pickle
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder, StandardScaler, LabelBinarizer, LabelEncoder
 from sklearn.metrics import mean_squared_error
-from sklearn.svm import LinearSVR
+from sklearn.svm import SVR, LinearSVR
 from keras.models import Sequential
 from keras.layers import Dense, Activation
 from keras.layers import LSTM
@@ -21,40 +21,50 @@ root = tk.Tk()
 root.withdraw()
 filepath = filedialog.askopenfilename()
 
-data = pickle.load(open(filepath, 'rb'))
+print('\nPreprocessing')
+big_data = pickle.load(open(filepath, 'rb'))
 
-data.drop_duplicates(subset='L-string', inplace=True)
+big_data.sort_values(by=['Area'], ascending=False, inplace=True)
 
-data = data[['L-string', 'Area']]
+max_area = big_data['Area'].head(1).values
 
-data.reset_index(inplace=True)
+data = pd.DataFrame(big_data['Rules'].apply(pd.Series).values.ravel())
+data.columns = ['Rule']
+data['Area'] = big_data['Ratios'].apply(pd.Series).values.ravel()
+
+data.drop_duplicates(subset=['Rule'], inplace=True)
+
+data.reset_index(inplace=True, drop=True)
 
 X = data['Area'].values
-Y = data['L-string']
+Y = data['Rule']
 
 """ --- Y data OneHotEncoding --- """
-astr = list(Y.iloc[0])
-to_dict = dict([(y, x+1) for x, y in enumerate(sorted(set(astr)))])
+chars = [
+    'F',
+    '+',
+    '-',
+    'X',
+]
+to_dict = dict([(y, x+1) for x, y in enumerate(sorted(set(chars)))])
 from_dict = {v: k for k, v in to_dict.items()}
 
 new = Y.map(list)
-frame = new.apply(pd.Series)
-enc_Y = frame.applymap(to_dict.get)
+enc_Y = new.apply(lambda x: np.array(list(filter(None, map(to_dict.get, x)))))
+enc_Y = np.stack(enc_Y, axis=0)
 
-# encoder = LabelEncoder()
-# encoder.fit_transform(Y.reshape(-1, 1))  # .toarray()
-# enc_Y = Y.apply(lambda x: ''.join([str(d.get(i)) for i in list(x)]))
-# enc_Y = pd.to_numeric(enc_Y, errors='coerce')
+binarizer = LabelBinarizer()
+enc_Y_1 = binarizer.fit_transform(Y.values.reshape(-1,1))
 
 """ --- X data StandardScaling --- """
 scaler = StandardScaler()
 enc_X = scaler.fit_transform(X.reshape(-1, 1))
 
 index = int(enc_X.shape[0]*0.9)
-X_train = enc_X[: index].flatten()
-Y_train = enc_Y[: index]
-X_test = enc_X[index:].flatten()
-Y_test = enc_Y[index:]
+X_train = enc_X[: index]
+Y_train = enc_Y_1[: index]
+X_test = enc_X[index:]
+Y_test = enc_Y_1[index:]
 
 """ --- KERAS ANN --- """
 # model = Sequential()
@@ -74,45 +84,43 @@ Y_test = enc_Y[index:]
 # img.show()
 
 """ --- LINEAR REGRESSION --- """
-# model = LinearRegression()
-# model.fit(X_train, Y_train)
+# model = LinearRegression(n_jobs=-1)
 
 """ --- SVM --- """
-if not os.path.exists('model.p'):
-    model = LinearSVR(C=1, loss='hinge', max_iter=1000, verbose=0)
-    model.fit(X=Y_train, y=X_train)
-    pickle.dump(model, open('model.p', 'wb'))
-else:
-    model = pickle.load(open('model.p', 'rb'))
+model = SVR(kernel="poly", gamma='scale', degree=1, C=100, epsilon=0.1)
 
-Y_predict = model.predict(Y_test)
-error = mean_squared_error(Y_predict, X_test.values)
-print('\n {0:.0%}'.format(error))
+# if not os.path.exists('model.p'):
+#     model = LinearSVR(C=1, loss='hinge', max_iter=1000, verbose=0)
+#     model.fit(X=X_train, y=Y_train)
+#     pickle.dump(model, open('model.p', 'wb'))
+# else:
+#     model = pickle.load(open('model.p', 'rb'))
 
-lstring = np.array('F' * 501)
-lstring = lstring.reshape(-1, 1)
-# X_new = encoder.transform(lstring)
-# max_area = scaler.transform(np.array((len(astr))).reshape(-1, 1))
-max_area = np.linspace(min(enc_X), max(enc_X), 10).reshape(-1, 1)
+print('\nTraining')
+model.fit(y=X_train, X=Y_train)
 
-max_predict = np.around(model.predict(max_area))
+test = binarizer.transform(['FFFFX'])
+Y_predict = model.predict(test)
+# error = mean_squared_error(Y_predict, Y_test)
+# print('\nMSE: {0:.3%}'.format(error))
+print(scaler.inverse_transform(Y_predict))
 
-strings = []
-pred_string = (np.vectorize(from_dict.__getitem__)(max_predict)).tolist()
-for pred in pred_string:
-    strings.append(''.join(pred))
+test = binarizer.transform(['++++X'])
+Y_predict = model.predict(test)
+print(scaler.inverse_transform(Y_predict))
 
-areas = []
-for area in max_area:
-    areas.append(scaler.inverse_transform(area))
+test = binarizer.transform(['FFFFF'])
+Y_predict = model.predict(test)
+print(scaler.inverse_transform(Y_predict))
 
-predictions = np.hstack(
-    (np.asarray(areas), np.asarray(strings).reshape(-1, 1)))
-pred_frame = pd.DataFrame(predictions, columns=[
-                          'Input Area', 'Predicted L-string'])
-pred_frame['Input Area'] = pd.to_numeric(pred_frame['Input Area'])
-pred_frame['Approximate Area'] = pred_frame['Predicted L-string'].str.count(
-    'F') + 0.7854
-pred_frame['% Error'] = (abs(pred_frame['Input Area'] -
-                             pred_frame['Approximate Area'])/pred_frame['Approximate Area'])*100
-pred_frame.to_csv('predicted.csv')
+# areas = [0, 50, 100, 150, 200, 250]
+# for area in areas:
+#     pred_area = scaler.transform(np.array(area).reshape(1,-1))
+#     prediction = model.predict(pred_area)
+#     string = binarizer.inverse_transform(prediction)
+
+#     print('Area: {} \t String: {}'.format(area, string))
+
+# pred_string = ''.join([from_dict.get(c, ' ') for c in max_predict.tolist()[0]])
+
+# print(string)
