@@ -111,6 +111,9 @@ if __name__ == "__main__":
         'length': 1.0,
     }
 
+    for _ in range(100):
+        genGen(params)
+
     with mp.Pool() as pool:
         np.random.seed()
         # results = list(pool.imap(genGen, repeat(params, iter)))

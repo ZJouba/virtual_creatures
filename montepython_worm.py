@@ -17,8 +17,6 @@ def genGen(params):
         '+',
         '-',
         'X',
-        '[',
-        ']',
     ]
 
     proba1 = np.random.uniform(0, 1)
@@ -46,11 +44,10 @@ def genGen(params):
         c.coords,
         c.area,
         c.bounds,
+        c.F,
         c.perF,
         c.perP,
         c.perM,
-        c.perB,
-        c.perN,
         c.maxF,
         c.maxP,
         c.maxM,
@@ -59,7 +56,6 @@ def genGen(params):
         c.avgM,
         c.angle,
         c.rules,
-        c.lines,
     )
 
     return list(a)
@@ -85,11 +81,10 @@ if __name__ == "__main__":
         'Coordinates',
         'Area',
         'Bounding Coordinates',
+        'No. of F',
         '% of F',
         '% of +',
         '% of -',
-        '% of [',
-        '% of ]',
         'Longest F sequence',
         'Longest + sequence',
         'Longest - sequence',
@@ -98,13 +93,12 @@ if __name__ == "__main__":
         'Average chars between -s',
         'Angle',
         'Rules',
-        'Lines',
     ]]
 
     params = {
-        'num_char': 5,  # 100,
+        'num_char': 5,
         'variables': 'X',
-        'constants': 'F+-[]',
+        'constants': 'F+-',
         'axiom': 'FX',
         'point': np.array([0, 0]),
         'vector': np.array([0, 1]),
@@ -129,6 +123,6 @@ if __name__ == "__main__":
 
     now = datetime.utcnow().strftime('%b %d, %Y @ %H.%M')
     file_name = os.path.join(
-        curr_dir, 'CSVs/branch_monte_carlo ' + now + '.p')
+        curr_dir, 'CSVs/monte_carlo ' + now + '.p')
 
     pickle.dump(population, open(file_name, 'wb'))

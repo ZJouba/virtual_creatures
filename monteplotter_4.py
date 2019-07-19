@@ -1,47 +1,45 @@
-from bokeh.io import output_file, show, export_png, export_svgs, save
-from bokeh.plotting import figure, curdoc, reset_output
-from bokeh.models import ColumnDataSource, Label, Range1d, Select
-from bokeh.layouts import row, column, Spacer
-from bokeh.models.glyphs import Patch
-from bokeh.models.widgets import PreText, Paragraph, Div
-from bokeh.models.markers import Cross
-from bokeh.events import Tap
-from bokeh.application.handlers import FunctionHandler
+import ast
+import gc
+import os
+import pickle
+import sys
+import time
+import tqdm
+import tkinter as tk
+from itertools import groupby
+from math import cos, pi, radians, sin
+from tkinter import filedialog
+
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from bokeh.application import Application
+from bokeh.application.handlers import FunctionHandler
+from bokeh.embed import file_html
+from bokeh.events import Tap
+from bokeh.io import export_png, export_svgs, output_file, save, show
+from bokeh.layouts import Spacer, column, row
+from bokeh.models import ColumnDataSource, Label, Range1d, Select
+from bokeh.models.glyphs import Patch
+from bokeh.models.markers import Cross
+from bokeh.models.widgets import Div, Paragraph, PreText
+from bokeh.palettes import RdYlGn11 as palette
+from bokeh.palettes import brewer
+from bokeh.plotting import curdoc, figure, reset_output
+from bokeh.resources import CDN
 from bokeh.server.server import Server
 from bokeh.transform import log_cmap
-from bokeh.palettes import brewer
-from bokeh.palettes import RdYlGn11 as palette
-from bokeh.embed import file_html
-from bokeh.resources import CDN
-from tornado.ioloop import IOLoop
-import pandas as pd
-from shapely.geometry import LineString
-import dask.dataframe as dd
-from dask.diagnostics import ProgressBar
-import numpy as np
-from tkinter import filedialog
-import tkinter as tk
-import os
-import gc
-import ast
-import sys
-from math import radians, cos, sin, pi
-from tabulate import tabulate
-import time
-import pickle
+from descartes.patch import PolygonPatch
 from nltk.util import ngrams
-from itertools import groupby
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from shapely.geometry import LineString, MultiLineString
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from tabulate import tabulate
+from tornado.ioloop import IOLoop
 
-
-def preProcessing():
-    root = tk.Tk()
-    root.withdraw()
-    filepath = filedialog.askopenfilename()
-
-    allData = pickle.load(open(filepath, 'rb'))
-
+def preProcessing(allData):
+    
     print('\n' + ('-' * 100))
     print('Preprocessing...')
     print('-' * 100 + '\n')
@@ -52,8 +50,12 @@ def preProcessing():
     allData.fillna(0, inplace=True)
     allData.replace(np.inf, 0, inplace=True)
 
-    allData.drop_duplicates(subset='L-string', inplace=True)
+    allData.drop_duplicates(subset=['L-string', 'Fitness'], inplace=True)
     allData.reset_index(inplace=True)
+
+    if allData.shape[0] > 5000:
+        allData = allData.sample(5000, weights='Fitness')
+
     try:
         allData['Angle'] = allData['Angle'].apply(lambda x: x*(180/pi))
     except:
@@ -61,10 +63,16 @@ def preProcessing():
     overlap = []
     linestrings = []
     for _, creature in allData.iterrows():
-        coords = creature['Coordinates']
-        linestrings.append(LineString(coords[:, 0:2]))
-        overlap.append(1 - creature['Area'] /
-                       (linestrings[-1].length+0.785))
+        if 'Lines' in allData:
+            lines = creature['Lines']
+            linestrings.append(MultiLineString(lines))
+            overlap.append(1 - creature['Area'] /
+                           (linestrings[-1].length))
+        else:
+            coords = creature['Coordinates']
+            linestrings.append(LineString(coords[:, 0:2]))
+            overlap.append(1 - creature['Area'] /
+                           (linestrings[-1].length+0.785))
 
     allData['Line Strings'] = linestrings
     allData['% Overlap'] = overlap
@@ -80,6 +88,10 @@ def preProcessing():
     scaler = MinMaxScaler(feature_range=(0, 10))
     allData['S_Area'] = scaler.fit_transform(
         allData['Area'].values.reshape(-1, 1))
+
+    sscaler = MinMaxScaler(feature_range=(0, 0.05))
+    allData['S_Fitness'] = sscaler.fit_transform(
+        allData['Fitness'].values.reshape(-1, 1))
 
     ngram_list = allData['L-string'].apply(lambda x: ((''.join(tup))
                                                       for i in range(2, 6) for tup in list(ngrams(list(x), i))))
@@ -127,7 +139,7 @@ def modify_doc(doc):
     dist = ColumnDataSource(data=dict(x=[0], F=[0], P=[0], M=[0]))
 
     hist, edges = np.histogram(
-        allData['S_Area'].values, bins=int(allData.shape[0]/10))
+        allData['S_Area'].values, bins='auto')
     dist_dict = ColumnDataSource(dict(
         hist=hist, edges_left=edges[:-1], edges_right=edges[1:]))
 
@@ -140,6 +152,9 @@ def modify_doc(doc):
         ('F', '@{% of F}{0.0%}'),
         ('+', '@{% of +}{0.0%}'),
         ('-', '@{% of -}{0.0%}'),
+        ('[', '@{% of [}{0.0%}'),
+        (']', '@{% of ]}{0.0%}'),
+        ('X', '@{% of X}{0.0%}'),
     ]
     tooltips2 = [
         ('index', '$index'),
@@ -152,6 +167,10 @@ def modify_doc(doc):
         ('Angle', '@Angle')
     ]
 
+    tips_branch = [
+        ('[', '@{% of [}{0.0%}'),
+        (']', '@{% of ]}{0.0%}'),
+    ]
     """ Plots
     -----------------------------------------------------------------------------------------------------
     """
@@ -175,23 +194,15 @@ def modify_doc(doc):
         'output_backend': 'webgl',
     }
 
-    per_scatter = figure(**fargs, title="Area", tooltips=tooltips1)
+    per_scatter = figure(**fargs, title="Fitness", tooltips=tooltips1)
     per_scatter.xaxis.axis_label = '% of character'
-    per_scatter.yaxis.axis_label = 'Area'
-    per_scatter.scatter('% of F', 'Area', **scargs)
+    per_scatter.yaxis.axis_label = 'Fitness'
+    per_scatter.scatter('% of F', 'Fitness', **scargs)
 
     seq_scatter = figure(**fargs, title="Area", tooltips=tooltips2)
     seq_scatter.xaxis.axis_label = 'Length of sequence'
     seq_scatter.yaxis.axis_label = 'Area'
     seq_scatter.scatter('Longest F sequence', 'Area', **scargs)
-
-    creature_plot = figure(**fargs, title="Selected Creature")
-    creature_plot.axis.visible = False
-    creature_plot.grid.visible = False
-    creature_plot.multi_polygons(xs='x', ys='y', source=polygon)
-    creature_plot.line(x='x', y='y', line_color='red', source=line)
-    start_point = Cross(x=0, y=0, size=10, line_color='red', line_width=5)
-    creature_plot.add_glyph(start_point)
 
     ang_scatter = figure(**fargs, title="Angle", tooltips=tips_angle)
     ang_scatter.scatter('Angle',  'Area', **scargs)
@@ -236,7 +247,8 @@ def modify_doc(doc):
     comp_scatter.yaxis.axis_label = 'Bounding box diagonal distance'
     comp_scatter.scatter('Length', 'Compactness', **scargs)
 
-    centr_scatter = figure(**fargs, title="Centroid location")
+    centr_scatter = figure(
+        **fargs, title="Centroid location", match_aspect=True)
     centr_scatter.xaxis.axis_label = 'X'
     centr_scatter.yaxis.axis_label = 'Y'
     centr_scatter.scatter('Centroid_X', 'Centroid_Y',
@@ -270,6 +282,18 @@ def modify_doc(doc):
     dist_plot.quad(top='hist', bottom=0, left='edges_left', right='edges_right',
                    fill_color="navy", line_color="white", alpha=0.5, source=dist_dict)
 
+    branch_scatter = figure(
+        **fargs, title="Branching chars")
+    branch_scatter.xaxis.axis_label = '% of ['
+    branch_scatter.yaxis.axis_label = '% of ]'
+    branch_scatter.scatter('% of [', '% of ]',
+                           radius='S_Fitness', **scargs)
+
+    F_plot = figure(**fargs, title="Area")
+    F_plot.xaxis.axis_label = 'No. of F'
+    F_plot.yaxis.axis_label = 'Area'
+    F_plot.scatter('No. of F', 'Area', **scargs)
+
     """ Text
     -----------------------------------------------------------------------------------------------------
     """
@@ -277,6 +301,7 @@ def modify_doc(doc):
     characteristics = Div(text='Select creature', width=450)
     grams_static = PreText(text='Select creature', width=450)
     grams_rolling = PreText(text='Select creature', width=450)
+    coordinates = PreText(text='Select creature', width=450)
 
     def clear():
         line.data = dict(x=[0, 0], y=[0, 0])
@@ -290,9 +315,10 @@ def modify_doc(doc):
         characteristics.text = 'Select creature'
         grams_static.text = 'Select creature'
         grams_rolling.text = 'Select creature'
+        coordinates.text ='Select creature'
 
     def to_coords(string, angle):
-        """Converts L-string to coordinates
+        """Converts rule to coordinates
 
         Parameters
         ----------
@@ -323,7 +349,7 @@ def modify_doc(doc):
 
         for c in string:
             if c == 'F':
-                coords[i] = coords[i-1] + curr_vec
+                coords[i, :3] = (coords[i-1, :3] + (1 * curr_vec))
                 i += 1
 
             if c == '-':
@@ -331,6 +357,20 @@ def modify_doc(doc):
 
             if c == '+':
                 curr_vec = np.dot(curr_vec, rotVec)
+
+            # if c == '[':
+            #     nodes = np.vstack((nodes, coords[i]))
+            #     nodes[-1,3] = 1
+
+            # if c == ']':
+            #     if coords[i-1,3] == 1:
+            #         coords[i,3] = 2
+            #         coords[i-1] = nodes[-1]
+            #         i += 1
+            #     else:
+            #         coords[i-1,3] = 2
+            #         coords[i] = nodes[-1]
+            #         i += 1
 
         coords = np.delete(coords, np.s_[i:], 0)
         return coords
@@ -353,9 +393,12 @@ def modify_doc(doc):
             coords = creature['Coordinates']
             try:
                 rules = creature['Rules']
-                rules = rules['X']
-                probas = rules['probabilities']
-                rules = rules['options']
+                try:
+                    rules = rules['X']
+                    probas = rules['probabilities']
+                    rules = rules['options']
+                except:
+                    probas = [0, 0]
 
                 characteristics.text = 'Area:\t{:.2f}'.format(creature['Area']) + \
                     '</br>' + \
@@ -418,23 +461,30 @@ def modify_doc(doc):
             grams_rolling.text = ('-' * 14) + ' Rolling n-grams ' + ('-' * 14) + '\n' + str(
                 tabulate(out, headers='keys'))
 
-            creature_linestring = LineString(coords[:, 0:2])
-            creature_patch = creature_linestring.buffer(0.4999999)
-            patch_x, patch_y = creature_patch.exterior.coords.xy
+            coordinates.text = str(
+                tabulate(creature['Coordinates'], headers='keys'))
 
-            x_points = [list(patch_x)]
-            y_points = [list(patch_y)]
+            if 'Lines' in creature:
+                creature_linestring = MultiLineString(creature['Lines'])
+            else:
+                creature_linestring = LineString(coords[:, 0:2])
 
-            for i, _ in enumerate(creature_patch.interiors):
-                x_in, y_in = creature_patch.interiors[i].coords.xy
-                x_points.append(list(x_in))
-                y_points.append(list(y_in))
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            creature_patch = PolygonPatch(
+                creature_linestring.buffer(0.5))
 
-            x_points = [[x_points]]
-            y_points = [[y_points]]
+            ax.add_patch(creature_patch)
 
-            line.data = dict(x=coords[:, 0], y=coords[:, 1])
-            polygon.data = dict(x=x_points, y=y_points)
+            for line in creature_linestring:
+                x, y = line.xy
+                ax.plot(x, y, 'r-', zorder=1)
+
+            ax.autoscale(axis='y')
+            ax.axis('equal')
+            plt.pause(0.1)
+            # plt.ioff()
+            # plt.show()
 
             if 'F' in rules[0]:
                 r_1_coords = to_coords(rules[0], creature['Angle'])
@@ -478,6 +528,8 @@ def modify_doc(doc):
 
         else:
             clear()
+            plt.close('all')
+            plt.ion()
 
     def update_dist(attrname, old, new):
         scaler = StandardScaler()
@@ -498,7 +550,9 @@ def modify_doc(doc):
     comp_angle.on_event(Tap, plot_creature)
     comp_char.on_event(Tap, plot_creature)
     comp_area.on_event(Tap, plot_creature)
+    F_plot.on_event(Tap, plot_creature)
     dist_select.on_change('value', update_dist)
+    branch_scatter.on_event(Tap, plot_creature)
 
     row_A = row(L_string)
     row_B = row(per_scatter, seq_scatter, ang_scatter, overlap_scatter)
@@ -506,14 +560,13 @@ def modify_doc(doc):
     row_C_middle = row(grams_rolling, grams_static)
     row_C = row(
         characteristics,
-        creature_plot,
         Spacer(width=50),
         row_C_middle,
         Spacer(width=50),
         row_C_right)
     row_D = row(char_F_dist, char_M_dist, char_P_dist)
     row_E = row(comp_scatter, comp_angle, comp_char, centr_scatter)
-    row_F = row(comp_area)
+    row_F = row(comp_area, F_plot, branch_scatter, coordinates)
     row_G = column(dist_select, dist_plot)
 
     layout = column(
@@ -536,12 +589,23 @@ def main():
     print('\n' + ('-' * 100))
     print('Select file...')
     print('-' * 100 + '\n')
+
     global allData
-    allData = preProcessing()
+
+    root = tk.Tk()
+    root.attributes("-topmost", True)
+    root.withdraw()
+    filepath = filedialog.askopenfilename()
+
+    allData = pickle.load(open(filepath, 'rb'))
+    
+    # allData = tqdm.tqdm(preProcessing(allData), total=allData.shape[0], file=sys.stdout)
+    allData = preProcessing(allData)
+
     print('\n' + ('-' * 100))
     print('ALL DONE!')
     print('-' * 100 + '\n')
-
+    plt.ion()
     print("Preparing a bokeh application.")
     io_loop = IOLoop.current()
     bokeh_app = Application(FunctionHandler(modify_doc))
