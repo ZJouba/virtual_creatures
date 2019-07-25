@@ -1,5 +1,9 @@
 from types import SimpleNamespace
 
+import plaidml.keras
+plaidml.keras.install_backend()
+import plaidml.keras.backend
+
 import sys
 import random
 
@@ -12,9 +16,7 @@ from sklearn.preprocessing import LabelBinarizer, StandardScaler
 from Tools.Classes import Creature
 
 def create_model():
-    # import plaidml.keras
-    # plaidml.keras.install_backend()
-    # import plaidml.keras.backend
+    
 
     from keras.layers import (ELU, Activation, BatchNormalization, Dense, Dropout,
                           InputLayer, Flatten, Reshape, LSTM, TimeDistributed)
@@ -183,17 +185,17 @@ def testRNN(gen_pars):
 
     idx = int(len(X) * 0.9)
 
-    X_train = X[:idx]
-    Y_train = Y[:idx]
+    X_train = X[:5000]
+    Y_train = Y[:5000]
 
-    X_test = X[idx+1:]
-    Y_test = Y[idx+1:]
+    X_test = X[5001:10000]
+    Y_test = Y[5001:10000]
 
-    model.fit(X_train, Y_train, epochs=10, verbose=1, callbacks=[es])
+    model.fit(X_train, Y_train, epochs=1, verbose=1, callbacks=[es])
 
     print(model.evaluate(X_test, Y_test))
 
-    for i in np.random.randin(idx+1, len(X), 5):
+    for i in np.random.randint(0, 5000, 5):
         print('L-string: \t {} \t Predicted area: \t {} \t Actual area: \t {}'.format(
             X_test[i],
             scaler.inverse_transform(model.predict(X_test[i])), 
