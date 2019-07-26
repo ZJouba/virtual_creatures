@@ -26,29 +26,29 @@ def create_model():
     from PIL import Image
 
     """ ----------------------------- VANILLA ARTIFICIAL NEURAL NETWORK ----------------------------- """
-    # model = Sequential()
-    # model.add(InputLayer(input_shape=(1,)))
-    # model.add(Dense(10, activation='relu'))
-    # model.add(Dense(60, activation='relu'))
-    # model.add(Reshape((10, 6)))
-    # model.add(Dense(6, activation='softmax'))
+    model = Sequential()
+    model.add(InputLayer(input_shape=(1,)))
+    model.add(Dense(10, activation='relu'))
+    model.add(Dense(60, activation='relu'))
+    model.add(Reshape((10, 6)))
+    model.add(Dense(10, activation='softmax'))
 
     # model.compile(loss='mse', optimizer='adam', metrics=['mae'])
 
-    model = Sequential()
-    model.add(LSTM(100, input_shape=(10,6), return_sequences=True))
-    model.add(LSTM(500, return_sequences=True))
-    model.add(LSTM(250, return_sequences=True))
-    model.add(LSTM(125, return_sequences=True))
-    model.add(LSTM(10))
-    model.add(Dropout(rate=0.25))
-    model.add(Dense(1))
-    model.add(Activation('softmax'))
+    # model = Sequential()
+    # model.add(LSTM(100, input_shape=(10,6), return_sequences=True))
+    # model.add(LSTM(500, return_sequences=True))
+    # model.add(LSTM(250, return_sequences=True))
+    # model.add(LSTM(125, return_sequences=True))
+    # model.add(LSTM(10))
+    # model.add(Dropout(rate=0.25))
+    # model.add(Dense(1))
+    # model.add(Activation('softmax'))
 
     model.compile(loss='mean_squared_error', optimizer='adam', metrics=['accuracy'])
 
-    # plot_model(model, 'model.png', show_layer_names=True, show_shapes=True)
-    # Image.open('model.png').show()
+    plot_model(model, 'model.png', show_layer_names=True, show_shapes=True)
+    Image.open('model.png').show()
     return model
 
 
