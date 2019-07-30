@@ -53,8 +53,8 @@ def preProcessing(allData):
     allData.drop_duplicates(subset=['L-string', 'Fitness'], inplace=True)
     allData.reset_index(inplace=True)
 
-    if allData.shape[0] > 5000:
-        allData = allData.sample(5000, weights='Fitness')
+    if allData.shape[0] > 2000:
+        allData = allData.sample(2000, weights='Fitness')
 
     try:
         allData['Angle'] = allData['Angle'].apply(lambda x: x*(180/pi))

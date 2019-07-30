@@ -1,6 +1,6 @@
-import plaidml.keras
-plaidml.keras.install_backend()
-import plaidml.keras.backend
+# import plaidml.keras
+# plaidml.keras.install_backend()
+# import plaidml.keras.backend
 
 import sys
 import random
@@ -48,6 +48,11 @@ def start_RL(gen_pars, rl_pars):
     epsilon = rl_pars.get('eps')
     decay = rl_pars.get('decay')
 
+    iteration = 0
+    iterations = rl_params.get('iterations')
+
+    frequency = iterations // (rl_pars.get('verbosity') * 60)
+
     action_space = list(gen_pars.get('variables')) + list(gen_pars.get('constants'))
 
 
@@ -70,9 +75,6 @@ def start_RL(gen_pars, rl_pars):
 
     model = create_model(input_shape, len(action_space))
 
-    iteration = 0
-    iterations = rl_params.get('iterations')
-
     cum_eps_reward = np.zeros(iterations+1)
     losses = np.zeros(iterations+1)
     reward_sum = 0
@@ -87,85 +89,95 @@ def start_RL(gen_pars, rl_pars):
     rules = []
 
     while iteration < (iterations+1):
+        buffer_x = []
+        buffer_y = []
+        buffer_r = []
 
         epsilon *= decay
 
-        while k < (input_size-1):
-            # Get current state
-            xs[k] = np.identity(input_size)[k]
+        while len(buffer_x) < rl_params.get('buffer_size'):
 
-            # Predict action given current state
-            probabilities = model.predict(xs[k][None,:])
+            while k < (input_size):
+                # Get current state
+                xs[k] = np.identity(input_size)[k]
 
-            if np.random.random() < epsilon:
-                # action_choice = np.random.choice(len(action_space), p=probabilities[0])
-                action_choice = np.random.randint(0, len(action_space))
-            else:
-                action_choice = np.argmax(probabilities)
+                # Predict action given current state
+                probabilities = model.predict(xs[k][None,:])
 
-            action = action_space[action_choice]
-            rules.append(action)
-            ys[k] = action_choice
+                if np.random.random() < epsilon:
+                    # action_choice = np.random.choice(len(action_space), p=probabilities[0])
+                    action_choice = np.random.randint(0, len(action_space))
+                else:
+                    action_choice = np.argmax(probabilities)
 
-            rs[k] = 0
+                action = action_space[action_choice]
+                rules.append(action)
+                ys[k] = action_choice
 
-            k += 1  
+                rs[k] = 0
 
-        """ ---------------------------------------------------------------------------------------------------------------------------------------------
-        PAIRWISE IS DIFFICULT TO TRAIN NEURAL NETWORK ON 
-        ---------------------------------------------------------------------------------------------------------------------------------------------"""
-        rules = ''.join(rules)
-        # rule_1 = (rules[:5])
-        # rule_2 = (rules[5:])
-        gen_pars['rules'] = {
-            'X': {
-                1: rules,
-                2: rules,
-            }}
+                buffer_x.append(xs[k])
+                buffer_y.append(ys[k])
 
-        indi = Creature(gen_pars)
+                k += 1  
 
-        reward = getattr(indi, gen_pars.get('fitness_metric'))
-        rs[k] = reward
-        cum_eps_reward[iteration] = reward
+            """ ---------------------------------------------------------------------------------------------------------------------------------------------
+            PAIRWISE IS DIFFICULT TO TRAIN NEURAL NETWORK ON 
+            ---------------------------------------------------------------------------------------------------------------------------------------------"""
+            rules = ''.join(rules)
+            # rule_1 = (rules[:5])
+            # rule_2 = (rules[5:])
+            gen_pars['rules'] = {
+                'X': {
+                    1: rules,
+                    2: rules,
+                }}
 
-        # Discount rewards - distribute single reward to all actions so each action has an associated reward
-        rs = discount_n_standardise(rs)
+            indi = Creature(gen_pars)
+
+            reward = getattr(indi, gen_pars.get('fitness_metric'))
+            rs[k-1] = reward
+            cum_eps_reward[iteration] = reward
+
+            # Discount rewards - distribute single reward to all actions so each action has an associated reward
+            rs = discount_n_standardise(rs)
+            buffer_r.extend(rs)
+
+            k = 0
+            rules = []
+            input_size = gen_pars.get('rule_length')
+            xs = np.zeros((input_size,input_size))
+            ys = np.zeros((input_size, 1))
+            rs = np.zeros(input_shape)
 
         model.fit(
-            xs,
-            ys, 
-            sample_weight=rs,
+            np.asarray(buffer_x),
+            np.asarray(buffer_y), 
+            sample_weight=np.asarray(buffer_r),
             epochs=1, 
-            verbose=0
+            verbose=0,
+            shuffle=True
         )
 
         losses[iteration] = model.evaluate(
-            xs,
-            ys,
-            sample_weight=rs,
+            np.asarray(buffer_x),
+            np.asarray(buffer_y),
+            sample_weight=np.asarray(buffer_r),
             verbose=0,
         )
 
-        frequency = iterations // (rl_pars.get('verbosity') * 10)
         if (iteration % frequency == 0) or iteration == iterations:
             ave_reward = np.mean(cum_eps_reward[max(0, iteration-frequency):iteration])
             ave_loss = np.mean(losses[max(0, iteration-frequency):iteration])
-            print('Iteration {0:d} of {1:d}\t Average Loss: {2:.2f}\t Average Reward: {3:.2f}\t Rule: {4}'.format(
+            print('Iteration {0:d} of {1:d}\t Average Loss: {2:.2f}\t Average Reward: {3:.2f}'.format(
                 iteration,
                 iterations,
                 ave_loss,
                 ave_reward,
-                rules,
             ))
         
         iteration += 1
-        k = 0
-        rules = []
-        input_size = gen_pars.get('rule_length')
-        xs = np.zeros((input_size,input_size))
-        ys = np.zeros((input_size, 1))
-        rs = np.zeros(input_shape)
+        
           
     window = 20
     fig, ax = plt.subplots(nrows=2, ncols=1)
@@ -262,9 +274,10 @@ if __name__ == "__main__":
         'gamma': 0.99,
         'eps': 0.5,
         'decay': 0.999,
-        'iterations': 100000,
+        'iterations': 100,
         'input_shape': (params.get('rule_length'),),
-        'verbosity': 4,                                   # 1 low -> 5 high
+        'verbosity': 1,                                   # 1 low -> 10 high
+        'buffer_size': 100,
     }
 
     # testRNN(params)

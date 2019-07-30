@@ -4,6 +4,7 @@ import pickle
 import random
 import sys
 import time
+import inspect
 from datetime import datetime
 from functools import partial
 from itertools import chain, repeat
@@ -17,7 +18,7 @@ import pandas as pd
 import tqdm
 from tabulate import tabulate
 
-from CreatureTools_n import B_Creature
+from Tools.Classes import Creature
 
 
 def genPop(params, predef_rules=None):
@@ -33,9 +34,9 @@ def genPop(params, predef_rules=None):
                    ']',
                    ]
         rule_A = ''.join([np.random.choice(choices)
-                          for _ in range(4)])
+                          for _ in range(params.get('rule_length'))])
         rule_B = ''.join([np.random.choice(choices)
-                          for _ in range(5)])
+                          for _ in range(params.get('rule_length'))])
         params['rules'] = {'X': {1: rule_A, 2: rule_B}}
     else:
         if params.get('pairwise'):
@@ -49,25 +50,43 @@ def genPop(params, predef_rules=None):
                 2: predef_rules
             }}
 
-    c = B_Creature(params)
-    a = (
+    if params.get('angle') == 'random':
+        params['angle'] = np.random.randint(0,90)
+
+    c = Creature(params)
+    """a = (
         c.l_string,
         c.coords,
         c.area,
         c.bounds,
-        c.F,
-        c.perF,
-        c.perP,
-        c.perM,
-        c.perB,
-        c.perN,
-        c.perX,
+        c.percentF,
+        # c.percent+,
+        # c.percent-,
+        # c.percent[,
+        # c.percent],
+        c.percentX,
+        # c.percent_,
+        c.countF,
+        c.count+,
+        c.count-,
+        c.count[,
+        c.count],
+        c.countX,
+        c.count_,
         c.maxF,
-        c.maxP,
-        c.maxM,
+        c.max+,
+        c.max-,
+        c.max[,
+        c.max],
+        c.maxX,
+        c.max_,
         c.avgF,
-        c.avgP,
-        c.avgM,
+        c.avg+,
+        c.avg-,
+        c.avg[,
+        c.avg],
+        c.avgX,
+        c.avg_,
         c.angle,
         c.rules,
         c.lines,
@@ -78,7 +97,7 @@ def genPop(params, predef_rules=None):
         # c.area,
         # c.rules,
         # c.ratio,
-    )
+    )"""
 
     return list(a)
 
@@ -90,19 +109,34 @@ def firstRun(iter, params):
         'Coordinates',
         'Area',
         'Bounding Coordinates',
-        'No. of F',
         '% of F',
         '% of +',
         '% of -',
         '% of [',
         '% of ]',
         '% of X',
+        '% of _',
+        'No. of F',
+        'No. of +',
+        'No. of -',
+        'No. of [',
+        'No. of ]',
+        'No. of X',
+        'No. of _',
         'Longest F sequence',
         'Longest + sequence',
         'Longest - sequence',
+        'Longest [ sequence',
+        'Longest ] sequence',
+        'Longest X sequence',
+        'Longest _ sequence',
         'Average chars between Fs',
         'Average chars between +s',
         'Average chars between -s',
+        'Average chars between [s',
+        'Average chars between ]s',
+        'Average chars between Xs',
+        'Average chars between _s',
         'Angle',
         'Rules',
         'Lines',
@@ -133,6 +167,7 @@ def selection(population):
                'X',
                '[',
                ']',
+               '_',
                ]
 
     elite = 2
@@ -160,8 +195,8 @@ def selection(population):
         random_no = int(total * random)
         for _ in range(random_no):
             next_gen.append([
-                (''.join([np.random.choice(choices) for _ in range(5)])),
-                (''.join([np.random.choice(choices) for _ in range(5)])),
+                (''.join([np.random.choice(choices) for _ in range(params.get('rule_length'))])),
+                (''.join([np.random.choice(choices) for _ in range(params.get('rule_length'))])),
             ])
 
         """ MUTATION """
@@ -209,7 +244,7 @@ def selection(population):
         random_no = int(total * random)
         for _ in range(random_no):
             next_gen.append(
-                (''.join([np.random.choice(choices) for _ in range(5)]))
+                (''.join([np.random.choice(choices) for _ in range(params.get('rule_length'))]))
             )
 
         """ MUTATION """
@@ -264,7 +299,7 @@ def plotting(fig, line, best_area):
 
 
 if __name__ == "__main__":
-
+    
     curr_dir = os.path.dirname(__file__)
 
     manager = mp.Manager()
@@ -285,15 +320,18 @@ if __name__ == "__main__":
 
     params = {
         'chars': 500,
-        'recurs': 5,
+        'recurs': 3,
         'variables': 'X',
-        'constants': 'F+-[]',
+        'constants': 'F+-[]_',
         'axiom': 'FX',
         'length': 1.0,
-        'angle': 25,
+        'angle': 'random',
         'prune': False,
         'pairwise': True,
+        'rule_length': 10,
     }
+
+    a = genPop(params)
 
     pop_size = [100]
 
