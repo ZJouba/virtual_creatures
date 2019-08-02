@@ -21,7 +21,7 @@ from tabulate import tabulate
 from Tools.Classes import Creature
 
 
-def genPop(params, predef_rules=None):
+def genPop(GA_params, predef_rules=None, listed=False):
 
     np.random.seed()
 
@@ -34,124 +34,47 @@ def genPop(params, predef_rules=None):
                    ']',
                    ]
         rule_A = ''.join([np.random.choice(choices)
-                          for _ in range(params.get('rule_length'))])
+                          for _ in range(GA_params.get('rule_length'))])
         rule_B = ''.join([np.random.choice(choices)
-                          for _ in range(params.get('rule_length'))])
-        params['rules'] = {'X': {1: rule_A, 2: rule_B}}
+                          for _ in range(GA_params.get('rule_length'))])
+        GA_params['rules'] = {'X': {1: rule_A, 2: rule_B}}
     else:
-        if params.get('pairwise'):
-            params['rules'] = {'X': {
+        if GA_params.get('pairwise'):
+            GA_params['rules'] = {'X': {
                 1: predef_rules[0],
                 2: predef_rules[1]
             }}
         else:
-            params['rules'] = {'X': {
+            GA_params['rules'] = {'X': {
                 1: predef_rules,
                 2: predef_rules
             }}
 
-    if params.get('angle') == 'random':
-        params['angle'] = np.random.randint(0,90)
+    if GA_params.get('angle') == 'random':
+        GA_params['angle'] = np.random.randint(0, 90)
 
-    c = Creature(params)
-    """a = (
-        c.l_string,
-        c.coords,
-        c.area,
-        c.bounds,
-        c.percentF,
-        # c.percent+,
-        # c.percent-,
-        # c.percent[,
-        # c.percent],
-        c.percentX,
-        # c.percent_,
-        c.countF,
-        c.count+,
-        c.count-,
-        c.count[,
-        c.count],
-        c.countX,
-        c.count_,
-        c.maxF,
-        c.max+,
-        c.max-,
-        c.max[,
-        c.max],
-        c.maxX,
-        c.max_,
-        c.avgF,
-        c.avg+,
-        c.avg-,
-        c.avg[,
-        c.avg],
-        c.avgX,
-        c.avg_,
-        c.angle,
-        c.rules,
-        c.lines,
-        c.ratio,
-        c.comp,
-        c.fitness,
-        # c.l_string,
-        # c.area,
-        # c.rules,
-        # c.ratio,
-    )"""
+    c = Creature(GA_params)
 
-    return list(a)
+    if listed:
+        return list(c.__dict__.keys())
+    else:
+        return list(c.__dict__.values())
 
 
-def firstRun(iter, params):
-    population = []
-    population = [[
-        'L-string',
-        'Coordinates',
-        'Area',
-        'Bounding Coordinates',
-        '% of F',
-        '% of +',
-        '% of -',
-        '% of [',
-        '% of ]',
-        '% of X',
-        '% of _',
-        'No. of F',
-        'No. of +',
-        'No. of -',
-        'No. of [',
-        'No. of ]',
-        'No. of X',
-        'No. of _',
-        'Longest F sequence',
-        'Longest + sequence',
-        'Longest - sequence',
-        'Longest [ sequence',
-        'Longest ] sequence',
-        'Longest X sequence',
-        'Longest _ sequence',
-        'Average chars between Fs',
-        'Average chars between +s',
-        'Average chars between -s',
-        'Average chars between [s',
-        'Average chars between ]s',
-        'Average chars between Xs',
-        'Average chars between _s',
-        'Angle',
-        'Rules',
-        'Lines',
-        'Rule ratio',
-        'Compactness',
-        'Fitness'
-        # 'L-string',
-        # 'Area',
-        # 'Rules',
-        # 'Rule ratio',
-    ]]
+def firstRun(iter, GA_params):
+
+    if GA_params.get('angle') == 'random':
+        GA_params['angle'] = np.random.randint(0, 90)
+        init_creature = genPop(GA_params, listed=True)
+        GA_params['angle'] = 'random'
+    else:
+        init_creature = genPop(GA_params, listed=True)
+
+    population = [init_creature]
 
     with mp.Pool(num_cores) as pool:
         result = list(
-            tqdm.tqdm(pool.imap(genPop, repeat(params, 100)), total=100))
+            tqdm.tqdm(pool.imap(genPop, repeat(GA_params, 100)), total=100))
         population = population + result
 
     return population
@@ -174,14 +97,14 @@ def selection(population):
     random = 0.05
     mutation = 0.1
 
-    if params.get('pairwise'):
+    if GA_params.get('pairwise'):
         total = len(population)
     else:
         total = len(population)/2
 
     next_gen = []
 
-    if params.get('pairwise'):
+    if GA_params.get('pairwise'):
         total_fitness = sum(
             population['Area A'].values + population['Area B'].values)
         probabilities = pd.Series(
@@ -195,8 +118,10 @@ def selection(population):
         random_no = int(total * random)
         for _ in range(random_no):
             next_gen.append([
-                (''.join([np.random.choice(choices) for _ in range(params.get('rule_length'))])),
-                (''.join([np.random.choice(choices) for _ in range(params.get('rule_length'))])),
+                (''.join([np.random.choice(choices)
+                          for _ in range(GA_params.get('rule_length'))])),
+                (''.join([np.random.choice(choices)
+                          for _ in range(GA_params.get('rule_length'))])),
             ])
 
         """ MUTATION """
@@ -244,7 +169,8 @@ def selection(population):
         random_no = int(total * random)
         for _ in range(random_no):
             next_gen.append(
-                (''.join([np.random.choice(choices) for _ in range(params.get('rule_length'))]))
+                (''.join([np.random.choice(choices)
+                          for _ in range(GA_params.get('rule_length'))]))
             )
 
         """ MUTATION """
@@ -299,26 +225,23 @@ def plotting(fig, line, best_area):
 
 
 if __name__ == "__main__":
-    
+
+    """ -------- PATHS AND FILE NAMES ---------- """
     curr_dir = os.path.dirname(__file__)
+    now = datetime.utcnow().strftime('%b %d, %Y @ %H.%M')
+    top_frame = os.path.join(
+        curr_dir, 'CSVs\\GA_top ' + now + '.p')
+    final_frame = os.path.join(
+        curr_dir, 'CSVs\\GA_final_pop ' + now + '.p')
+    all_frame = os.path.join(
+        curr_dir, 'CSVs\\GA_all ' + now + '.p')
+    """ ---------------------------------------- """
 
     manager = mp.Manager()
 
-    global params, num_cores
+    global GA_params, num_cores
 
-    best_area = manager.list([[0, 0]])
-
-    num_cores = mp.cpu_count() - 2
-
-    fig, ax = plt.subplots()
-    ax.set_xlabel('Generation')
-    ax.set_ylabel('Fitness')
-    ax.grid()
-    line, = plt.plot(best_area[0][0], best_area[0][1], 'r-')
-
-    plot_proc = mp.Process(target=plotting, args=(fig, line, best_area,))
-
-    params = {
+    GA_params = {
         'chars': 500,
         'recurs': 3,
         'variables': 'X',
@@ -329,40 +252,50 @@ if __name__ == "__main__":
         'prune': False,
         'pairwise': True,
         'rule_length': 10,
+        'fitness_metric': 'Area'
     }
 
-    a = genPop(params)
+    best_area = manager.list([[0, 0]])
+
+    num_cores = mp.cpu_count() - 2
+
+    fig, ax = plt.subplots()
+    ax.set_xlabel('Generation')
+    ax.set_ylabel(GA_params.get('fitness_metric'))
+    ax.grid()
+    line, = plt.plot(best_area[0][0], best_area[0][1], 'r-')
+
+    plot_proc = mp.Process(target=plotting, args=(fig, line, best_area,))
 
     pop_size = [100]
 
     for pop in pop_size:
-        population = firstRun(pop, params)
+        population = firstRun(pop, GA_params)
 
         sys.stdout.write('\nDone! Creating dataframe \n')
 
         population = pd.DataFrame(population[1:], columns=population[0])
 
-        population.sort_values(by='Fitness', ascending=False, inplace=True)
+        population.sort_values(by=GA_params.get(
+            'fitness_metric'), ascending=False, inplace=True)
 
         population.reset_index(inplace=True, drop=True)
 
-        if params.get('pairwise'):
+        if GA_params.get('pairwise'):
             rule_frame = population['Rules'].apply(pd.Series)
             rule_frame.columns = ['Rule A', 'Rule B']
             rule_frame[['Area A', 'Area B']
-                       ] = population['Rule ratio'].apply(pd.Series)
+                       ] = population['Ratio'].apply(pd.Series)
 
         else:
             rule_frame = pd.DataFrame(
                 population['Rules'].apply(pd.Series).values.ravel())
             rule_frame.columns = ['Rule']
-            rule_frame['Area'] = population['Rule ratio'].apply(
+            rule_frame['Area'] = population['Ratio'].apply(
                 pd.Series).values.ravel()
             rule_frame.sort_values(by=['Area'], ascending=False, inplace=True)
 
         sys.stdout.write('Done! \n')
-
-        max_area = params.get('chars')
 
         i = 0
 
@@ -377,15 +310,12 @@ if __name__ == "__main__":
 
         plot_proc.start()
 
-        max_area = 1365  # see write-book for formula
-
         stop_crit = False
-        patience = 200
+        patience = 1000
         top_log = population['Area'].iloc[0]
-        # tolerance = 1e-4
         teller = 0
 
-        while not stop_crit:  # > tolerance:
+        while not stop_crit:
 
             if os.path.exists(os.path.join(curr_dir, 'kill.txt')):
                 curses.endwin()
@@ -400,7 +330,7 @@ if __name__ == "__main__":
             new_gen = selection(rule_frame)
 
             with mp.Pool(num_cores) as pool:
-                func = partial(genPop, params)
+                func = partial(genPop, GA_params)
                 """ WITH PROGRESSBARS """
                 # result = list(tqdm.tqdm(pool.imap_unordered(func, new_gen), total=len(new_gen), file=sys.stdout))
                 """ WITHOUT PROGRESSBARS """
@@ -416,38 +346,49 @@ if __name__ == "__main__":
 
             population.iloc[:, :] = result
 
-            population.sort_values(by='Fitness', ascending=False, inplace=True)
+            population.sort_values(by=GA_params.get(
+                'fitness_metric'), ascending=False, inplace=True)
 
-            if params.get('pairwise'):
+            if GA_params.get('pairwise'):
                 rule_frame = population['Rules'].apply(pd.Series)
                 rule_frame.columns = ['Rule A', 'Rule B']
                 rule_frame[['Area A', 'Area B']
-                           ] = population['Rule ratio'].apply(pd.Series)
+                           ] = population['Ratio'].apply(pd.Series)
 
             else:
                 rule_frame = pd.DataFrame(
                     population['Rules'].apply(pd.Series).values.ravel())
                 rule_frame.columns = ['Rule']
-                rule_frame['Area'] = population['Rule ratio'].apply(
+                rule_frame['Area'] = population['Ratio'].apply(
                     pd.Series).values.ravel()
                 rule_frame.sort_values(
                     by=['Area'], ascending=False, inplace=True)
 
-            best_area.append([i+1, population['Fitness'].iloc[0]])
+            best_area.append(
+                [i+1, population[GA_params.get('fitness_metric')].iloc[0]])
 
             top_gens.append(list(population.iloc[0, :]))
             all_gens = all_gens + population.values.tolist()
 
-            if population['Fitness'].iloc[0] > top_log:
-                top_log = population['Fitness'].iloc[0]
+            if i % 10 == 0:
+                top_gens_frame = pd.DataFrame(
+                    top_gens[1:], columns=top_gens[0])
+                all_gens_frame = pd.DataFrame(
+                    all_gens[1:], columns=all_gens[0])
+
+                pickle.dump(top_gens_frame, open(top_frame, 'wb'))
+                pickle.dump(population, open(final_frame, 'wb'))
+                pickle.dump(all_gens_frame, open(all_frame, 'wb'))
+                top_gens_frame.to_csv(os.path.join(
+                    curr_dir, 'CSVs/generations ' + now + '.csv'))
+                population.to_csv(os.path.join(
+                    curr_dir, 'CSVs/final_pop ' + now + '.csv'))
+
+            if population[GA_params.get('fitness_metric')].iloc[0] > top_log:
+                top_log = population[GA_params.get('fitness_metric')].iloc[0]
                 teller = 0
             else:
                 teller += 1
-                # if (teller >= patience):
-                #     if (0.9 * max_area) < top_log < (1.1 * max_area):
-                #         stop_crit = True
-                #         curses.endwin()
-                #         sys.stdout.write('Stopping criteria reached!')
                 if teller >= patience:
                     stop_crit = True
                     curses.endwin()
@@ -455,24 +396,16 @@ if __name__ == "__main__":
 
             i += 1
 
-        plot_proc.join()
-        plot_proc.terminate()
+        top_gens_frame = pd.DataFrame(top_gens[1:], columns=top_gens[0])
+        all_gens_frame = pd.DataFrame(all_gens[1:], columns=all_gens[0])
 
-        top_gens = pd.DataFrame(top_gens[1:], columns=top_gens[0])
-        all_gens = pd.DataFrame(all_gens[1:], columns=all_gens[0])
-
-        now = datetime.utcnow().strftime('%b %d, %Y @ %H.%M')
-        top_frame = os.path.join(
-            curr_dir, 'CSVs/GA_top ' + now + '.p')
-        final_frame = os.path.join(
-            curr_dir, 'CSVs/GA_final_pop ' + now + '.p')
-        all_frame = os.path.join(
-            curr_dir, 'CSVs/GA_all ' + now + '.p')
-
-        pickle.dump(top_gens, open(top_frame, 'wb'))
+        pickle.dump(top_gens_frame, open(top_frame, 'wb'))
         pickle.dump(population, open(final_frame, 'wb'))
-        pickle.dump(all_gens, open(all_frame, 'wb'))
-        top_gens.to_csv(os.path.join(
+        pickle.dump(all_gens_frame, open(all_frame, 'wb'))
+        top_gens_frame.to_csv(os.path.join(
             curr_dir, 'CSVs/generations ' + now + '.csv'))
         population.to_csv(os.path.join(
             curr_dir, 'CSVs/final_pop ' + now + '.csv'))
+
+        plot_proc.join()
+        plot_proc.terminate()

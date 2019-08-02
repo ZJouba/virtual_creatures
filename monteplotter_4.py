@@ -11,7 +11,7 @@ from math import cos, pi, radians, sin
 from tkinter import filedialog
 
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -50,11 +50,11 @@ def preProcessing(allData):
     allData.fillna(0, inplace=True)
     allData.replace(np.inf, 0, inplace=True)
 
-    allData.drop_duplicates(subset=['L-string', 'Fitness'], inplace=True)
+    allData.drop_duplicates(subset=['L_string', 'Fitness'], inplace=True)
     allData.reset_index(inplace=True)
 
     if allData.shape[0] > 2000:
-        allData = allData.sample(2000, weights='Fitness')
+        allData = allData.sample(10000, weights='Fitness')
 
     try:
         allData['Angle'] = allData['Angle'].apply(lambda x: x*(180/pi))
@@ -69,7 +69,7 @@ def preProcessing(allData):
             overlap.append(1 - creature['Area'] /
                            (linestrings[-1].length))
         else:
-            coords = creature['Coordinates']
+            coords = creature['Coords']
             linestrings.append(LineString(coords[:, 0:2]))
             overlap.append(1 - creature['Area'] /
                            (linestrings[-1].length+0.785))
@@ -80,7 +80,7 @@ def preProcessing(allData):
         lambda x: x.centroid.x)
     allData['Centroid_Y'] = allData['Line Strings'].apply(
         lambda x: x.centroid.y)
-    allData['Compactness'] = allData['Bounding Coordinates'].apply(
+    allData['Compactness'] = allData['Bounds'].apply(
         lambda x: np.linalg.norm(x))
     allData['Length'] = allData['Line Strings'].apply(
         lambda x: x.length)
@@ -93,7 +93,7 @@ def preProcessing(allData):
     allData['S_Fitness'] = sscaler.fit_transform(
         allData['Fitness'].values.reshape(-1, 1))
 
-    ngram_list = allData['L-string'].apply(lambda x: ((''.join(tup))
+    ngram_list = allData['L_string'].apply(lambda x: ((''.join(tup))
                                                       for i in range(2, 6) for tup in list(ngrams(list(x), i))))
 
     gram = []
@@ -106,7 +106,7 @@ def preProcessing(allData):
     gc.collect()
 
     for i in range(2, 6):
-        allData['{}-gram'.format(i)] = allData['L-string'].apply(lambda x: [x[j:j+i]
+        allData['{}-gram'.format(i)] = allData['L_string'].apply(lambda x: [x[j:j+i]
                                                                             for j in range(0, len(x), i)])
 
     allData.to_csv("frameCSV.csv")
@@ -149,18 +149,19 @@ def modify_doc(doc):
 
     tooltips1 = [
         ('index', '$index'),
-        ('F', '@{% of F}{0.0%}'),
-        ('+', '@{% of +}{0.0%}'),
-        ('-', '@{% of -}{0.0%}'),
-        ('[', '@{% of [}{0.0%}'),
-        (']', '@{% of ]}{0.0%}'),
-        ('X', '@{% of X}{0.0%}'),
+        ('F', '@{PercentF}{0.0%}'),
+        ('+', '@{Percent+}{0.0%}'),
+        ('-', '@{Percent-}{0.0%}'),
+        ('[', '@{Percent[}{0.0%}'),
+        (']', '@{Percent]}{0.0%}'),
+        ('X', '@{PercentX}{0.0%}'),
+        ('_', '@{Percent_}{0.0%}'),
     ]
     tooltips2 = [
         ('index', '$index'),
-        ('F', '@{Longest F sequence}'),
-        ('+', '@{Longest + sequence}'),
-        ('-', '@{Longest - sequence}'),
+        ('F', '@{MaxF}'),
+        ('+', '@{Max+}'),
+        ('-', '@{Max-}'),
     ]
 
     tips_angle = [
@@ -168,8 +169,8 @@ def modify_doc(doc):
     ]
 
     tips_branch = [
-        ('[', '@{% of [}{0.0%}'),
-        (']', '@{% of ]}{0.0%}'),
+        ('[', '@{Percent[}{0.0%}'),
+        (']', '@{Percent]}{0.0%}'),
     ]
     """ Plots
     -----------------------------------------------------------------------------------------------------
@@ -197,12 +198,12 @@ def modify_doc(doc):
     per_scatter = figure(**fargs, title="Fitness", tooltips=tooltips1)
     per_scatter.xaxis.axis_label = '% of character'
     per_scatter.yaxis.axis_label = 'Fitness'
-    per_scatter.scatter('% of F', 'Fitness', **scargs)
+    per_scatter.scatter('PercentF', 'Fitness', **scargs)
 
     seq_scatter = figure(**fargs, title="Area", tooltips=tooltips2)
     seq_scatter.xaxis.axis_label = 'Length of sequence'
     seq_scatter.yaxis.axis_label = 'Area'
-    seq_scatter.scatter('Longest F sequence', 'Area', **scargs)
+    seq_scatter.scatter('MaxF', 'Area', **scargs)
 
     ang_scatter = figure(**fargs, title="Angle", tooltips=tips_angle)
     ang_scatter.scatter('Angle',  'Area', **scargs)
@@ -223,19 +224,19 @@ def modify_doc(doc):
                          title="F character distribution", output_backend="webgl"
                          )
     char_F_dist.varea_stack('F', x='x', source=dist)
-    char_F_dist.xaxis.axis_label = 'L-string length'
+    char_F_dist.xaxis.axis_label = 'L_string length'
 
     char_M_dist = figure(plot_width=plot_width, plot_height=plot_height//2,
                          title="- character distribution", output_backend="webgl"
                          )
     char_M_dist.varea_stack('M', x='x', source=dist)
-    char_M_dist.xaxis.axis_label = 'L-string length'
+    char_M_dist.xaxis.axis_label = 'L_string length'
 
     char_P_dist = figure(plot_width=plot_width, plot_height=plot_height//2,
                          title="+ character distribution", output_backend="webgl"
                          )
     char_P_dist.varea_stack('P', x='x', source=dist)
-    char_P_dist.xaxis.axis_label = 'L-string length'
+    char_P_dist.xaxis.axis_label = 'L_string length'
 
     overlap_scatter = figure(**fargs, title="Overlap")
     overlap_scatter.xaxis.axis_label = 'Angle'
@@ -262,8 +263,8 @@ def modify_doc(doc):
     comp_char = figure(**fargs, title="Compactness")
     comp_char.xaxis.axis_label = '% of char'
     comp_char.yaxis.axis_label = 'Bounding box diagonal distance'
-    comp_char.scatter('% of +', 'Compactness', **scargs)
-    comp_char.scatter('% of -', 'Compactness', **scargs)
+    comp_char.scatter('Percent+', 'Compactness', **scargs)
+    comp_char.scatter('Percent-', 'Compactness', **scargs)
 
     comp_area = figure(**fargs, title="Compactness")
     comp_area.xaxis.axis_label = 'Area'
@@ -286,13 +287,24 @@ def modify_doc(doc):
         **fargs, title="Branching chars")
     branch_scatter.xaxis.axis_label = '% of ['
     branch_scatter.yaxis.axis_label = '% of ]'
-    branch_scatter.scatter('% of [', '% of ]',
+    branch_scatter.scatter('Percent[', 'Percent]',
                            radius='S_Fitness', **scargs)
 
     F_plot = figure(**fargs, title="Area")
     F_plot.xaxis.axis_label = 'No. of F'
     F_plot.yaxis.axis_label = 'Area'
-    F_plot.scatter('No. of F', 'Area', **scargs)
+    F_plot.scatter('CountF', 'Area', **scargs)
+
+    scatter_select_x = Select(value='Area', title='Any plot x-value',
+                         options=list(allData.select_dtypes(include=[np.number]).columns[1:].values))
+    scatter_select_y = Select(value='Area', title='Any plot y-value',
+                         options=list(allData.select_dtypes(include=[np.number]).columns[1:].values))
+    scatter_select = figure(**fargs,
+                            title="Any scatter",
+                            x_axis_label='Select metric',
+                            y_axis_label='Select metric'
+                            )
+    
 
     """ Text
     -----------------------------------------------------------------------------------------------------
@@ -323,14 +335,14 @@ def modify_doc(doc):
         Parameters
         ----------
         string : String
-            L-string of creature
+            L_string of creature
         angle : Float
             Delta-angle (in radians) for creature
 
         Returns
         -------
         List
-            Coordinate list representing L-string
+            Coordinate list representing L_string
         """
 
         num_chars = len(string)
@@ -390,7 +402,7 @@ def modify_doc(doc):
 
             creature_index = scatter.selected.indices[0]
             creature = allData.iloc[creature_index, :]
-            coords = creature['Coordinates']
+            coords = creature['Coords']
             try:
                 rules = creature['Rules']
                 try:
@@ -402,14 +414,14 @@ def modify_doc(doc):
 
                 characteristics.text = 'Area:\t{:.2f}'.format(creature['Area']) + \
                     '</br>' + \
-                    'Achievable creature area:\t{}'.format(creature['L-string'].count('F')+0.785) + \
+                    'Achievable creature area:\t{}'.format(creature['L_string'].count('F')+0.785) + \
                     '</br>' + \
-                    'Overlap:\t{:.1%}'.format(1 - creature['Area'] / (creature['L-string'].count('F')+0.785)) + \
+                    'Overlap:\t{:.1%}'.format(1 - creature['Area'] / (creature['L_string'].count('F')+0.785)) + \
                     '</br>' + \
-                    'Length of L-string:\t{}'.format(len(creature['L-string'])) + \
+                    'Length of L_string:\t{}'.format(len(creature['L_string'])) + \
                     '</br>' + \
                     'Achievable maxmimum area:\t{}'.format(
-                        len(creature['L-string']) + 0.785) + \
+                        len(creature['L_string']) + 0.785) + \
                     '</br>' + \
                     'Rule 1: <i><tab>{}</i>'.format(rules[0]) + \
                     '<tab><tab> Pr: <tab>{:.2%}'.format(probas[0]) + \
@@ -420,16 +432,16 @@ def modify_doc(doc):
             except:
                 characteristics.text = 'Area:\t{:.2f}'.format(creature['Area']) + \
                     '</br>' + \
-                    'Achievable creature area:\t{}'.format(creature['L-string'].count('F')+0.785) + \
+                    'Achievable creature area:\t{}'.format(creature['L_string'].count('F')+0.785) + \
                     '</br>' + \
-                    'Overlap:\t{:.1%}'.format(1 - creature['Area'] / (creature['L-string'].count('F')+0.785)) + \
+                    'Overlap:\t{:.1%}'.format(1 - creature['Area'] / (creature['L_string'].count('F')+0.785)) + \
                     '</br>' + \
-                    'Length of L-string:\t{}'.format(len(creature['L-string'])) + \
+                    'Length of L_string:\t{}'.format(len(creature['L_string'])) + \
                     '</br>' + \
                     'Achievable maxmimum area:\t{}'.format(
-                        len(creature['L-string']) + 0.785)
+                        len(creature['L_string']) + 0.785)
 
-            L_string.text = '{}'.format(creature['L-string'])
+            L_string.text = '{}'.format(creature['L_string'])
 
             gram_frame_1 = pd.DataFrame.from_dict(
                 {'2-gram': creature['2-gram'],
@@ -462,7 +474,7 @@ def modify_doc(doc):
                 tabulate(out, headers='keys'))
 
             coordinates.text = str(
-                tabulate(creature['Coordinates'], headers='keys'))
+                tabulate(creature['Coords'], headers='keys'))
 
             if 'Lines' in creature:
                 creature_linestring = MultiLineString(creature['Lines'])
@@ -482,7 +494,7 @@ def modify_doc(doc):
 
             ax.autoscale(axis='y')
             ax.axis('equal')
-            plt.pause(0.1)
+            plt.pause(10)
             # plt.ioff()
             # plt.show()
 
@@ -508,7 +520,7 @@ def modify_doc(doc):
                 )
                 r_2.data = dict(x=r_2_coords[:, 0], y=r_2_coords[:, 1])
 
-            c_string = creature['L-string']
+            c_string = creature['L_string']
             bins_width = 10
             bins = int(len(c_string)//bins_width)
             dists = {}
@@ -540,6 +552,14 @@ def modify_doc(doc):
         dist_dict.data = dict(
             hist=hist, edges_left=edges[:-1], edges_right=edges[1:])
         dist_plot.xaxis.axis_label = name
+    
+    def update_scatter(attrname, old, new):
+        scatter_select.renderers = []
+        scatter_select.scatter(
+            x=scatter_select_x.value, y=scatter_select_y.value, **scargs)
+        scatter_select.xaxis.axis_label = scatter_select_x.value
+        scatter_select.yaxis.axis_label = scatter_select_y.value
+
 
     per_scatter.on_event(Tap, plot_creature)
     seq_scatter.on_event(Tap, plot_creature)
@@ -552,7 +572,10 @@ def modify_doc(doc):
     comp_area.on_event(Tap, plot_creature)
     F_plot.on_event(Tap, plot_creature)
     dist_select.on_change('value', update_dist)
+    scatter_select_x.on_change('value', update_scatter)
+    scatter_select_y.on_change('value', update_scatter)
     branch_scatter.on_event(Tap, plot_creature)
+    scatter_select.on_event(Tap, plot_creature)
 
     row_A = row(L_string)
     row_B = row(per_scatter, seq_scatter, ang_scatter, overlap_scatter)
@@ -568,6 +591,7 @@ def modify_doc(doc):
     row_E = row(comp_scatter, comp_angle, comp_char, centr_scatter)
     row_F = row(comp_area, F_plot, branch_scatter, coordinates)
     row_G = column(dist_select, dist_plot)
+    row_H = column(scatter_select_x, scatter_select_y, scatter_select)
 
     layout = column(
         row_A,
@@ -577,6 +601,7 @@ def modify_doc(doc):
         row_E,
         row_F,
         row_G,
+        row_H,
     )
 
     clear()

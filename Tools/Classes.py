@@ -4,6 +4,7 @@ from math import radians, cos, sin, pi
 import re
 import random
 
+
 class Creature:
     """
     Generates a complete virtual creature
@@ -32,15 +33,15 @@ class Creature:
             {"A": "AB",
             "B": "A"}
         """
-        self.choices = []
-        self.params = params
-        self.rules = params.get('rules')
-        self.l_string = params.get('axiom')
-        self.constants = params.get('constants')
-        self.variables = params.get('variables')
-        self.angle = radians(params.get('angle'))
+        self.Choices = []
+        self.Params = params
+        self.Rules = params.get('rules')
+        self.L_string = params.get('axiom')
+        self.Constants = params.get('constants')
+        self.Variables = params.get('variables')
+        self.Angle = radians(params.get('angle'))
         self.recur(params.get('recurs'))
-        self.length = params.get('length')
+        self.Length = params.get('length')
         self.mapper()
         self.tolines()
         self.morphology()
@@ -48,19 +49,20 @@ class Creature:
 
     def recur(self, iters):
         for _ in range(iters+1):
-            if self.l_string.count('X') == 0:
+            if self.L_string.count('X') == 0:
                 break
             else:
-                self.l_string = ''.join([self.next_char(c) for c in self.l_string])
-        
-        if self.params.get('prune'):
-            self.l_string = self.l_string[:500]
+                self.L_string = ''.join([self.next_char(c)
+                                         for c in self.L_string])
+
+        if self.Params.get('prune'):
+            self.L_string = self.L_string[:500]
 
     def next_char(self, c):
-        rule = self.rules.get(c, c)
+        rule = self.Rules.get(c, c)
         if not rule == c:
-            key, choice = random.choice(list(self.rules.get(c).items()))
-            self.choices.append(key)
+            key, choice = random.choice(list(self.Rules.get(c).items()))
+            self.Choices.append(key)
             return choice
         else:
             return rule
@@ -74,14 +76,14 @@ class Creature:
             List of coordinates
         """
 
-        num_chars = len(self.l_string)
+        num_chars = len(self.L_string)
 
         coords = np.zeros((num_chars + 1, 4), np.double)
         nodes = np.zeros((1, 4), np.double)
 
         rotVec = np.array((
-            (cos(self.angle), -sin(self.angle), 0),
-            (sin(self.angle), cos(self.angle), 0),
+            (cos(self.Angle), -sin(self.Angle), 0),
+            (sin(self.Angle), cos(self.Angle), 0),
             (0, 0, 1)
         ))
 
@@ -89,9 +91,9 @@ class Creature:
         curr_vec = start_vec
         i = 1
 
-        for c in self.l_string:
+        for c in self.L_string:
             if c == 'F':
-                coords[i, :3] = (coords[i-1, :3] + (self.length * curr_vec))
+                coords[i, :3] = (coords[i-1, :3] + (self.Length * curr_vec))
                 i += 1
 
             if c == '-':
@@ -116,7 +118,7 @@ class Creature:
                     i += 1
 
         coords = np.delete(coords, np.s_[i:], 0)
-        self.coords = coords
+        self.Coords = coords
 
     def tolines(self):
         """Converts L-string coordinates to individual line segments
@@ -129,15 +131,15 @@ class Creature:
         lines = []
 
         j = 0
-        for i in range(len(self.coords)):
-            if (self.coords[i, 3] == 2) or (i == (len(self.coords) - 1)):
-                lines.append(self.coords[j:i+1, :2].tolist())
+        for i in range(len(self.Coords)):
+            if (self.Coords[i, 3] == 2) or (i == (len(self.Coords) - 1)):
+                lines.append(self.Coords[j:i+1, :2].tolist())
                 j = i+1
 
         if not lines:
-            self.lines = [self.coords[:, :3]]
+            self.Lines = [self.Coords[:, :3]]
         else:
-            self.lines = [line for line in lines if len(line) > 1]
+            self.Lines = [line for line in lines if len(line) > 1]
 
     def morphology(self):
         """Converts coordinates or lines to shapely object and buffers
@@ -148,48 +150,54 @@ class Creature:
             L-creature "body"
         """
 
-        if len(self.lines) > 1:
-            self.linestring = MultiLineString(self.lines)
+        if len(self.Lines) > 1:
+            self.Linestring = MultiLineString(self.Lines)
         else:
-            self.linestring = LineString(self.coords[:, :2])
-            
-        self.area = self.linestring.buffer(self.length/2).area
-        self.bounds = self.linestring.bounds
+            self.Linestring = LineString(self.Coords[:, :2])
+
+        self.Area = self.Linestring.buffer(self.Length/2).area
+        self.Bounds = self.Linestring.bounds
 
     def results(self):
-        chars = set(list(self.constants + self.variables))
+        chars = set(list(self.Constants + self.Variables))
         avgs = dict()
 
         for char in chars:
             avgs[char] = re.findall(
-                '(?<=' + re.escape(char) + ').*?(?=' + re.escape(char) + ')', self.l_string)
+                '(?<=' + re.escape(char) + ').*?(?=' + re.escape(char) + ')', self.L_string)
 
         for char in chars:
             if len(avgs[char]) == 0:
                 avgs[char] = 0.0
             else:
-                avgs[char] = sum([len(char) for char in avgs[char]])/len(avgs[char])
-        
+                avgs[char] = sum([len(char)
+                                  for char in avgs[char]])/len(avgs[char])
+
         for char in chars:
-            setattr(self, 'percent' + char, self.l_string.count(char)/len(self.l_string))
-            setattr(self, 'count' + char, self.l_string.count(char))
-            setattr(self, 'average' + char, avgs.get(char))
+            setattr(self, 'Percent' + char,
+                    self.L_string.count(char)/len(self.L_string))
+            setattr(self, 'Count' + char, self.L_string.count(char))
+            setattr(self, 'Average' + char, avgs.get(char))
 
             try:
-                setattr(self, 'max' + char, max(len(s) for s in re.findall(r'[' + char + ']+', self.l_string)))
+                setattr(self, 'Max' + char, max(len(s)
+                                                for s in re.findall(r'[' + char + ']+', self.L_string)))
             except:
-                setattr(self, 'max' + char, 0)
+                setattr(self, 'Max' + char, 0)
 
-        self.comp = np.linalg.norm(self.bounds)
+        self.Comp = np.linalg.norm(self.Bounds)
 
-        self.fitness = self.area/self.comp
+        self.Fitness = self.Area/self.Comp
 
-        self.ratio = np.array([
-            (self.choices.count(1)/len(self.choices)) * self.fitness,
-            (self.choices.count(2)/len(self.choices)) * self.fitness,
+        self.Ratio = np.array([
+            (self.Choices.count(1)/len(self.Choices)) * self.Fitness,
+            (self.Choices.count(2)/len(self.Choices)) * self.Fitness,
         ])
 
-        self.rules = list(self.rules['X'].values())
+        self.Rules = list(self.Rules['X'].values())
+
+        self.Efficiency = self.Area/self.CountF
+
 
 class Environment:
     """ Creates the environment
@@ -201,7 +209,7 @@ class Environment:
     def __init__(self, params):
 
         self.params = params
-        
+
         self.growth_coords = []
         for _ in range(3):
             self.growth_coords.append([
