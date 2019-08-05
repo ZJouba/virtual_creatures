@@ -1,8 +1,13 @@
 import numpy as np
-from shapely.geometry import LineString, MultiLineString
+# LinearRing, LineString, MultiLineString, Point, Polygon, box
+from shapely.geometry import *
+from shapely.ops import unary_union
 from math import radians, cos, sin, pi
 import re
 import random
+from descartes.patch import PolygonPatch
+from matplotlib.patches import Circle, Wedge
+from matplotlib import pyplot as plt
 
 
 class Creature:
@@ -42,6 +47,7 @@ class Creature:
         self.Angle = radians(params.get('angle'))
         self.recur(params.get('recurs'))
         self.Length = params.get('length')
+        self.env = params.get('env')
         self.mapper()
         self.tolines()
         self.morphology()
@@ -59,13 +65,22 @@ class Creature:
             self.L_string = self.L_string[:500]
 
     def next_char(self, c):
-        rule = self.Rules.get(c, c)
-        if not rule == c:
-            key, choice = random.choice(list(self.Rules.get(c).items()))
-            self.Choices.append(key)
-            return choice
-        else:
-            return rule
+        if c not in self.Rules:
+            return c
+
+        d = self.Rules[c]
+        r = int(random.random() * len(d))
+        self.Choices.append(r)
+
+        return d[r+1]
+
+        # rule = self.Rules.get(c, c)
+        # if not rule == c:
+        #     key, choice = random.choice(list(self.Rules.get(c).items()))
+        #     self.Choices.append(key)
+        #     return choice
+        # else:
+        #     return rule
 
     def mapper(self):
         """Converts L-string to coordinates
@@ -92,6 +107,11 @@ class Creature:
         i = 1
 
         for c in self.L_string:
+            """
+            1: Node
+            2: Branch
+            3: Saved
+            """
             if c == 'F':
                 coords[i, :3] = (coords[i-1, :3] + (self.Length * curr_vec))
                 i += 1
@@ -109,12 +129,16 @@ class Creature:
 
             if c == ']':
                 if coords[i-1, 3] == 1:
-                    coords[i, 3] = 2
+                    # coords[i, 3] = 2
                     coords[i-1] = nodes[-1]
-                    i += 1
+                    # i += 1
                 else:
                     coords[i-1, 3] = 2
-                    coords[i] = nodes[-1]
+                    if len(nodes) == 1:
+                        coords[i] = nodes[-1]
+                    else:
+                        value, nodes = nodes[-1], nodes[:-1]
+                        coords[i] = value
                     i += 1
 
         coords = np.delete(coords, np.s_[i:], 0)
@@ -155,7 +179,13 @@ class Creature:
         else:
             self.Linestring = LineString(self.Coords[:, :2])
 
-        self.Area = self.Linestring.buffer(self.Length/2).area
+        self.absorbA = self.Linestring.buffer(self.Length/2)
+
+        self.Area = 0
+        for patch in self.env.patches:
+            # * patch._alpha)
+            self.Area += (self.absorbA.intersection(patch).area)
+
         self.Bounds = self.Linestring.bounds
 
     def results(self):
@@ -189,14 +219,16 @@ class Creature:
 
         self.Fitness = self.Area/self.Comp
 
-        self.Ratio = np.array([
-            (self.Choices.count(1)/len(self.Choices)) * self.Fitness,
-            (self.Choices.count(2)/len(self.Choices)) * self.Fitness,
-        ])
-
         self.Rules = list(self.Rules['X'].values())
 
-        self.Efficiency = self.Area/self.CountF
+        self.Efficiency = self.Area/self.absorbA.area
+
+        self.Ratio = np.array([
+            (self.Choices.count(1)/len(self.Choices)) *
+            getattr(self, self.Params.get('fitness_metric')),
+            (self.Choices.count(2)/len(self.Choices)) *
+            getattr(self, self.Params.get('fitness_metric')),
+        ])
 
 
 class Environment:
@@ -206,18 +238,64 @@ class Environment:
 
     """
 
-    def __init__(self, params):
+    def __init__(self, params=None):
+        scale = {
+            'small': 2,
+            'medium': 4,
+            'large': 6,
+        }
 
-        self.params = params
+        richness = {
+            'scarce': 1,
+            'common': 5,
+            'abundant': 10,
+        }
 
-        self.growth_coords = []
-        for _ in range(3):
-            self.growth_coords.append([
-                random.randint(-30, 30), random.randint(-30, 30)
-            ])
+        self.shape = params.get('shape')
+        self.richness = richness[params.get('richness')]
+        self.scale = scale[params.get('scale')]
         self.patches = []
-        self.circles = []
-        for coord in self.growth_coords:
-            self.patches.append(matplotlib.patches.Circle(
-                coord, radius=random.randint(5, 10), color='red', alpha=np.random.uniform(0, 1)))
-            self.circles.append(Point(coord).buffer(5))
+        radius = (1 * self.scale)
+
+        if self.shape == 'circle':
+            width = self.richness
+            radius = (1 * self.scale) + self.richness
+            circle_patch = plt.Circle((0, 0), radius)
+            self.patches.append(circle_patch)
+
+        if self.shape == 'square':
+            box_patch = LinearRing([
+                (-radius, -radius),
+                (-radius, radius),
+                (radius, radius),
+                (radius, -radius)]).buffer(self.richness)
+            self.patches.append(box_patch)
+
+        if self.shape == 'triangle':
+            triangle_patch = LinearRing([
+                (-0.866 * radius, -0.5 * radius),
+                (0, radius),
+                (0.866 * radius, -0.5 * radius)]).buffer(self.richness)
+            self.patches.append(triangle_patch)
+
+        # if self.shape == 'rainbow':
+
+        if self.shape == 'patches':
+            radii = radius * \
+                np.random.dirichlet(np.ones(self.richness), 1)
+            for rad in radii[0]:
+                coords = self.scale * 10 * \
+                    np.array([np.random.uniform(-1, 1),
+                              np.random.uniform(-1, 1)])
+                patch = Point(coords).buffer(rad)
+                self.patches.append(patch)
+
+            # for _ in range(3):
+            #     self.growth_coords.append([
+            #         random.randint(-30, 30), random.randint(-30, 30)
+            #     ])
+
+            # for coord in self.growth_coords:
+            #     self.patches.append(matplotlib.patches.Circle(
+            #         coord, radius=random.randint(5, 10), color='red', alpha=np.random.uniform(0, 1)))
+            # self.circles.append(Point(coord).buffer(5))

@@ -9,7 +9,7 @@ import tkinter as tk
 from itertools import groupby
 from math import cos, pi, radians, sin
 from tkinter import filedialog
-
+import multiprocessing
 import matplotlib
 matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
@@ -47,14 +47,14 @@ def preProcessing(allData):
     if not isinstance(allData, pd.DataFrame):
         allData = pd.DataFrame(allData[1:], columns=allData[0])
 
-    allData.fillna(0, inplace=True)
-    allData.replace(np.inf, 0, inplace=True)
+    # allData.fillna(0, inplace=True)
+    # allData.replace(np.inf, 0, inplace=True)
 
-    allData.drop_duplicates(subset=['L_string', 'Fitness'], inplace=True)
-    allData.reset_index(inplace=True)
+    # allData.drop_duplicates(subset=['L_string', 'Fitness'], inplace=True)
+    # allData.reset_index(inplace=True)
 
-    if allData.shape[0] > 2000:
-        allData = allData.sample(10000, weights='Fitness')
+    # if allData.shape[0] > 2000:
+    #     allData = allData.sample(int(allData.shape[0]*0.5), weights='Fitness')
 
     try:
         allData['Angle'] = allData['Angle'].apply(lambda x: x*(180/pi))
@@ -168,10 +168,6 @@ def modify_doc(doc):
         ('Angle', '@Angle')
     ]
 
-    tips_branch = [
-        ('[', '@{Percent[}{0.0%}'),
-        (']', '@{Percent]}{0.0%}'),
-    ]
     """ Plots
     -----------------------------------------------------------------------------------------------------
     """
@@ -263,8 +259,8 @@ def modify_doc(doc):
     comp_char = figure(**fargs, title="Compactness")
     comp_char.xaxis.axis_label = '% of char'
     comp_char.yaxis.axis_label = 'Bounding box diagonal distance'
-    comp_char.scatter('Percent+', 'Compactness', **scargs)
-    comp_char.scatter('Percent-', 'Compactness', **scargs)
+    # comp_char.scatter('Percent+', 'Compactness', **scargs)
+    # comp_char.scatter('Percent-', 'Compactness', **scargs)
 
     comp_area = figure(**fargs, title="Compactness")
     comp_area.xaxis.axis_label = 'Area'
@@ -347,7 +343,8 @@ def modify_doc(doc):
 
         num_chars = len(string)
 
-        coords = np.zeros((num_chars + 1, 3), np.double)
+        coords = np.zeros((num_chars + 1, 4), np.double)
+        nodes = np.zeros((1, 4), np.double)
 
         rotVec = np.array((
             (cos(angle), -sin(angle), 0),
@@ -360,6 +357,11 @@ def modify_doc(doc):
         i = 1
 
         for c in string:
+            """
+            1: Node
+            2: Branch
+            3: Saved
+            """
             if c == 'F':
                 coords[i, :3] = (coords[i-1, :3] + (1 * curr_vec))
                 i += 1
@@ -370,19 +372,24 @@ def modify_doc(doc):
             if c == '+':
                 curr_vec = np.dot(curr_vec, rotVec)
 
-            # if c == '[':
-            #     nodes = np.vstack((nodes, coords[i]))
-            #     nodes[-1,3] = 1
+            if c == '[':
+                nodes = np.vstack((nodes, coords[i-1]))
+                coords[i-1, 3] = 3
+                nodes[-1, 3] = 1
 
-            # if c == ']':
-            #     if coords[i-1,3] == 1:
-            #         coords[i,3] = 2
-            #         coords[i-1] = nodes[-1]
-            #         i += 1
-            #     else:
-            #         coords[i-1,3] = 2
-            #         coords[i] = nodes[-1]
-            #         i += 1
+            if c == ']':
+                if coords[i-1, 3] == 1:
+                    # coords[i, 3] = 2
+                    coords[i-1] = nodes[-1]
+                    # i += 1
+                else:
+                    coords[i-1, 3] = 2
+                    if len(nodes) == 1:
+                        coords[i] = nodes[-1]
+                    else:
+                        value, nodes = nodes[-1], nodes[:-1]
+                        coords[i] = value
+                    i += 1
 
         coords = np.delete(coords, np.s_[i:], 0)
         return coords
@@ -491,12 +498,19 @@ def modify_doc(doc):
             for line in creature_linestring:
                 x, y = line.xy
                 ax.plot(x, y, 'r-', zorder=1)
+            
+            for p in env.patches:
+                p = PolygonPatch(p)
+                color = np.random.rand(3,)
+                p.set_color(color)
+                p.set_alpha(0.4)
+                ax.add_patch(p)
 
             ax.autoscale(axis='y')
             ax.axis('equal')
-            plt.pause(10)
-            # plt.ioff()
-            # plt.show()
+            # plt.draw()
+            # fig.canvas.draw_idle()
+            # plt.pause(1)
 
             if 'F' in rules[0]:
                 r_1_coords = to_coords(rules[0], creature['Angle'])
@@ -537,11 +551,11 @@ def modify_doc(doc):
                 dists['M'].append(c_string.count('-', start, end))
             [dists['x'].append(i) for i in range(1, bins+1)]
             dist.data = dists
+            plt.show()
 
         else:
             clear()
             plt.close('all')
-            plt.ion()
 
     def update_dist(attrname, old, new):
         scaler = StandardScaler()
@@ -615,31 +629,33 @@ def main():
     print('Select file...')
     print('-' * 100 + '\n')
 
-    global allData
+    global allData, env
 
     root = tk.Tk()
     root.attributes("-topmost", True)
     root.withdraw()
     filepath = filedialog.askopenfilename()
 
-    allData = pickle.load(open(filepath, 'rb'))
-    
-    # allData = tqdm.tqdm(preProcessing(allData), total=allData.shape[0], file=sys.stdout)
-    allData = preProcessing(allData)
+    if filepath:
+        allData = pickle.load(open(filepath, 'rb'))
 
-    print('\n' + ('-' * 100))
-    print('ALL DONE!')
-    print('-' * 100 + '\n')
-    plt.ion()
-    print("Preparing a bokeh application.")
-    io_loop = IOLoop.current()
-    bokeh_app = Application(FunctionHandler(modify_doc))
+        env_path = os.path.dirname(filepath) + '/Environment ' + filepath[-22:]
+        env = pickle.load(open(env_path, 'rb'))
+        
+        # allData = tqdm.tqdm(preProcessing(allData), total=allData.shape[0], file=sys.stdout)
+        allData = preProcessing(allData)
 
-    server = Server({'/app': bokeh_app}, io_loop=io_loop, port=5001)
-    server.start()
-    print("Opening Bokeh application on http://localhost:5006/")
-    server.show('/app')
-    io_loop.start()
+        print('\n' + ('-' * 100))
+        print('ALL DONE!')
+        print('-' * 100 + '\n')
+        print("Preparing a bokeh application.")
+        io_loop = IOLoop.current()
+        bokeh_app = Application(FunctionHandler(modify_doc))
 
+        server = Server({'/app': bokeh_app}, io_loop=io_loop, port=5001)
+        server.start()
+        print("Opening Bokeh application on http://localhost:5006/")
+        server.show('/app')
+        io_loop.start()
 
 main()
