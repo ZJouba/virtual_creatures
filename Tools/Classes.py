@@ -8,6 +8,7 @@ import random
 from descartes.patch import PolygonPatch
 from matplotlib.patches import Circle, Wedge
 from matplotlib import pyplot as plt
+import matplotlib as mpl
 
 
 class Creature:
@@ -44,7 +45,12 @@ class Creature:
         self.L_string = params.get('axiom')
         self.Constants = params.get('constants')
         self.Variables = params.get('variables')
-        self.Angle = radians(params.get('angle'))
+
+        if params.get('angle') == 'random':
+            self.Angle = radians(np.random.randint(0, 90))
+        else:
+            self.Angle = radians(params.get('angle'))
+
         self.recur(params.get('recurs'))
         self.Length = params.get('length')
         self.env = params.get('env')
@@ -182,9 +188,12 @@ class Creature:
         self.absorbA = self.Linestring.buffer(self.Length/2)
 
         self.Area = 0
-        for patch in self.env.patches:
-            # * patch._alpha)
-            self.Area += (self.absorbA.intersection(patch).area)
+        if not self.env.patches:
+            self.Area = self.absorbA.area
+        else:
+            for patch in self.env.patches:
+                p = PolygonPatch(patch)  # * patch._alpha)
+                self.Area += (self.absorbA.intersection(patch).area)
 
         self.Bounds = self.Linestring.bounds
 
@@ -240,9 +249,9 @@ class Environment:
 
     def __init__(self, params=None):
         scale = {
-            'small': 2,
-            'medium': 4,
-            'large': 6,
+            'small': 4,
+            'medium': 8,
+            'large': 12,
         }
 
         richness = {
@@ -259,9 +268,14 @@ class Environment:
 
         if self.shape == 'circle':
             width = self.richness
-            radius = (1 * self.scale) + self.richness
-            circle_patch = plt.Circle((0, 0), radius)
-            self.patches.append(circle_patch)
+            center = (0, 0)
+            radius = (2 * self.scale)
+            ring = Wedge(center, radius, 0, 360)
+            ring_coords = ring._path.vertices
+            ring_coords = ring_coords[(ring_coords[:, 0] != center[0]) & (
+                ring_coords[:, 1] != center[1])]
+            ring_patch = LinearRing(ring_coords).buffer(self.richness)
+            self.patches.append(ring_patch)
 
         if self.shape == 'square':
             box_patch = LinearRing([
@@ -278,7 +292,21 @@ class Environment:
                 (0.866 * radius, -0.5 * radius)]).buffer(self.richness)
             self.patches.append(triangle_patch)
 
-        # if self.shape == 'rainbow':
+        if self.shape == 'rainbow':
+            width = self.richness
+            center = (0, 0)
+            radius = (1 * self.scale)
+
+            rainbow = Wedge(center, radius, 90, 270)
+
+            # rotate = mpl.transforms.Affine2D().rotate_deg(random.randint(0, 360))
+
+            # rainbow.set_transform(rotate)
+
+            rainbow_coords = rainbow._path.vertices
+            rainbow_patch = LineString(
+                rainbow_coords[:13]).buffer(self.richness)
+            self.patches.append(rainbow_patch)
 
         if self.shape == 'patches':
             radii = radius * \
@@ -289,13 +317,3 @@ class Environment:
                               np.random.uniform(-1, 1)])
                 patch = Point(coords).buffer(rad)
                 self.patches.append(patch)
-
-            # for _ in range(3):
-            #     self.growth_coords.append([
-            #         random.randint(-30, 30), random.randint(-30, 30)
-            #     ])
-
-            # for coord in self.growth_coords:
-            #     self.patches.append(matplotlib.patches.Circle(
-            #         coord, radius=random.randint(5, 10), color='red', alpha=np.random.uniform(0, 1)))
-            # self.circles.append(Point(coord).buffer(5))

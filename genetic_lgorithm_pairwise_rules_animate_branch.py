@@ -5,14 +5,16 @@ import random
 import sys
 import time
 import inspect
+import gc
 from datetime import datetime
 from functools import partial
 from itertools import chain, repeat
-from math import ceil
+from math import ceil, degrees
 import curses
 
 import matplotlib.pyplot as plt
 from matplotlib.collections import PatchCollection
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from descartes import PolygonPatch
 from matplotlib.animation import FuncAnimation
 import numpy as np
@@ -44,20 +46,24 @@ def genPop(GA_params, predef_rules=None, listed=False):
                 1: predef_rules,
                 2: predef_rules
             }}
+        if predef_rules[2] == 'random':
+            GA_params['angle'] = 'random'
+        else:
+            GA_params['angle'] = degrees(predef_rules[2])
 
-    if GA_params.get('angle') == 'random':
-        GA_params['angle'] = np.random.randint(0, 90)
+    # if GA_params.get('angle') == 'random':
+    #     GA_params['angle'] = np.random.randint(0, 90)
 
     # for _ in range(100):
-    #     c = Creature(GA_params)
+    c = Creature(GA_params)
 
-    done = True
-    while done:
-        try:
-            c = Creature(GA_params)
-            done = False
-        except:
-            pass
+    # done = True
+    # while done:
+    #     try:
+    #         c = Creature(GA_params)
+    #         done = False
+    #     except:
+    #         pass
 
     if listed:
         return list(c.__dict__.keys())
@@ -67,12 +73,16 @@ def genPop(GA_params, predef_rules=None, listed=False):
 
 def firstRun(iter, GA_params):
 
-    if GA_params.get('angle') == 'random':
-        GA_params['angle'] = np.random.randint(0, 90)
-        init_creature = genPop(GA_params, listed=True)
-        GA_params['angle'] = 'random'
-    else:
-        init_creature = genPop(GA_params, listed=True)
+    # if GA_params.get('angle') == 'random':
+    #     GA_params['angle'] = np.random.randint(0, 90)
+    #     init_creature = genPop(GA_params, listed=True)
+    #     GA_params['angle'] = 'random'
+    # elif GA_params.get('angle') == 'learnable':
+
+    # else:
+    #     init_creature = genPop(GA_params, listed=True)
+
+    init_creature = genPop(GA_params, listed=True)
 
     population = [init_creature]
 
@@ -86,12 +96,12 @@ def firstRun(iter, GA_params):
 
 def selection(population, iter):
 
-    global probabilities, random
+    global probabilities, random, decay
 
     np.random.seed()
 
     if iter == 0:
-        decay = 0.85
+        decay = 0.95
         random = 0.5
     elif random > 0.05:
         random *= decay
@@ -121,7 +131,8 @@ def selection(population, iter):
 
         """ ELITE """
         for i in range(elite):
-            next_gen.append(list(population[['Rule A', 'Rule B']].iloc[i]))
+            next_gen.append(
+                list(population[['Rule A', 'Rule B', 'Angle']].iloc[i]))
 
         """ RANDOM """
         random_no = int(total * random)
@@ -131,6 +142,7 @@ def selection(population, iter):
                           for _ in range(GA_params.get('rule_length'))])),
                 (''.join([np.random.choice(GA_params.get('choices'))
                           for _ in range(GA_params.get('rule_length'))])),
+                'random',
             ])
 
         """ MUTATION """
@@ -149,6 +161,7 @@ def selection(population, iter):
             next_gen.append([
                 ''.join(mutatee_1),
                 ''.join(mutatee_2),
+                'random',
             ])
 
         """ CROSSOVER """
@@ -164,7 +177,7 @@ def selection(population, iter):
             child_1 = parent_1_A[:index_1] + parent_2_A[index_1:]
             child_2 = parent_1_B[:index_2] + parent_2_B[index_2:]
             next_gen.append([
-                child_1, child_2
+                child_1, child_2, 'random',
             ])
     else:
         total_fitness = sum(population[GA_params.get('fitness_metric')].values)
@@ -216,8 +229,9 @@ def selection(population, iter):
     return next_gen
 
 
-def plotter(frame, line, best_area):
-    value_arr = np.asarray(best_area)
+def plotter(frame, line, best_area, value_arr):
+    # value_arr = np.asarray(best_area)
+    value_arr[:] = [best_area]
     try:
         value_arr = value_arr.T
     except:
@@ -231,15 +245,18 @@ def plotter(frame, line, best_area):
 
 
 def plotting(fig, line, best_area):
+    value_arr = np.empty(2, dtype=object)
     ani = FuncAnimation(fig, plotter, fargs=(
-        line, best_area, ), interval=200, save_count=1)
+        line, best_area, value_arr, ), interval=200, save_count=1)
     if len(best_area) > 100:
         ani.event_source.interval = 500
+
     plt.show()
 
 
 if __name__ == "__main__":
 
+    test_arr = np.empty(2, dtype=object)
     manager = mp.Manager()
 
     global GA_params, num_cores
@@ -251,16 +268,20 @@ if __name__ == "__main__":
         'constants': 'F+-[]_',
         'axiom': 'FX',
         'length': 1.0,
-        'angle': 'random',
+        'angle': 'random',  # 'random' 'value'
+        'learnable': True,
         'prune': False,
         'pairwise': True,
         'rule_length': 5,
         'fitness_metric': 'Area',
-        'patience': 500,
-        'shape': 'square',  # 'circle' 'square' 'rainbow' 'triangle' 'patches'
-        'richness': 'common',  # 'scarce' 'common' 'abundant'
-        'scale': 'small',  # 'small' 'medium' 'large'
+        'patience': 100,
+        'shape': 'rainbow',  # 'circle' 'square' 'rainbow' 'triangle' 'patches' 'uniform'
+        'richness': 'scarce',  # 'scarce' 'common' 'abundant'
+        'scale': 'medium',  # 'small' 'medium' 'large'
     }
+
+    use_curses = False
+    total_achievable = 0
 
     """ -------- PATHS AND FILE NAMES ---------- """
     curr_dir = os.path.dirname(__file__)
@@ -278,17 +299,23 @@ if __name__ == "__main__":
 
     env = Environment(GA_params)
 
+    if not env.patches:
+        total_achievable = 0
+    else:
+        for p in env.patches:
+            total_achievable += p.area
+
     pickle.dump(env, open(env_path, 'wb'))
 
     GA_params['env'] = env
 
-    # fig, ax = plt.subplots()
+    fig, ax = plt.subplots()
 
-    # for p in env.patches:
-    #     ax.add_patch(PolygonPatch(p))
-
-    # plt.autoscale()
-    # plt.show()
+    for p in env.patches:
+        ax.add_patch(PolygonPatch(p))
+    ax.plot(0, 0, 'xr')
+    plt.autoscale()
+    plt.show()
 
     GA_params['choices'] = list(GA_params.get(
         'variables') + GA_params.get('constants'))
@@ -301,6 +328,9 @@ if __name__ == "__main__":
     ax.set_xlabel('Generation')
     ax.set_ylabel(GA_params.get('fitness_metric'))
     ax.grid()
+    if total_achievable > 0:
+        ax.axhline(total_achievable, linewidth=4, color='r')
+        plt.text(0, total_achievable+0.1, 'Total available area')
     line, = plt.plot(best_area[0][0], best_area[0][1], 'r-')
 
     plot_proc = mp.Process(target=plotting, args=(fig, line, best_area,))
@@ -329,6 +359,7 @@ if __name__ == "__main__":
             rule_frame[[GA_params.get(
                 'fitness_metric')]] = population[GA_params.get(
                     'fitness_metric')].apply(pd.Series)
+            rule_frame['Angle'] = population['Angle'].apply(pd.Series)
 
         else:
             rule_frame = pd.DataFrame(
@@ -336,6 +367,7 @@ if __name__ == "__main__":
             rule_frame.columns = ['Rule']
             rule_frame['Ratio'] = population['Ratio'].apply(
                 pd.Series).values.ravel()
+            rule_frame['Angle'] = population['Angle'].apply(pd.Series)
             rule_frame.sort_values(by=['Ratio'], ascending=False, inplace=True)
 
         sys.stdout.write('Done! \n')
@@ -348,8 +380,9 @@ if __name__ == "__main__":
         all_gens = [list(population.columns)]
         all_gens = all_gens + population.values.tolist()
 
-        stdscr = curses.initscr()
-        stdscr.refresh()
+        if use_curses:
+            stdscr = curses.initscr()
+            stdscr.refresh()
 
         plot_proc.start()
 
@@ -357,32 +390,48 @@ if __name__ == "__main__":
         top_log = population[GA_params.get('fitness_metric')].iloc[0]
         teller = 0
 
+        dur = 0
         while not stop_crit:
 
             if os.path.exists(os.path.join(curr_dir, 'kill.txt')):
-                curses.endwin()
+                if use_curses:
+                    curses.endwin()
                 sys.stdout.write('Manually killed')
                 break
 
-            stdscr.addstr(0, 0, 'Iteration: {}\r'.format(i))
-            stdscr.refresh()
+            if use_curses:
+                stdscr.addstr(0, 0, 'Iteration: {}\r'.format(i))
+                stdscr.refresh()
 
             result_list = []
 
             new_gen = selection(rule_frame, i)
+            start = time.time()
 
             with mp.Pool(num_cores) as pool:
                 func = partial(genPop, GA_params)
                 """ WITH PROGRESSBARS """
                 # result = list(tqdm.tqdm(pool.imap_unordered(func, new_gen), total=len(new_gen), file=sys.stdout))
                 """ WITHOUT PROGRESSBARS """
-                stdscr.addstr(1, 0, 'Busy...')
-                stdscr.clrtoeol()
-                stdscr.refresh()
+                if use_curses:
+                    stdscr.addstr(1, 0, 'Busy...')
+                    stdscr.clrtoeol()
+                    stdscr.refresh()
                 result = list(pool.imap_unordered(func, new_gen))
-                stdscr.addstr(1, 0, 'Done')
-                stdscr.clrtoeol()
-                stdscr.refresh()
+                if use_curses:
+                    stdscr.addstr(1, 0, 'Done')
+                    stdscr.clrtoeol()
+                    stdscr.refresh()
+
+            end = time.time()
+
+            dur += (end - start)
+
+            avg = dur/(i+1)
+
+            if use_curses:
+                stdscr.addstr(
+                    2, 0, 'Running average class time: \t {:.5f} seconds'.format(avg))
 
             pool.join()
 
@@ -401,6 +450,7 @@ if __name__ == "__main__":
                 rule_frame[[GA_params.get(
                     'fitness_metric')]] = population[GA_params.get(
                         'fitness_metric')].apply(pd.Series)
+                rule_frame['Angle'] = population['Angle'].apply(pd.Series)
 
             else:
                 rule_frame = pd.DataFrame(
@@ -408,11 +458,14 @@ if __name__ == "__main__":
                 rule_frame.columns = ['Rule']
                 rule_frame['Ratio'] = population['Ratio'].apply(
                     pd.Series).values.ravel()
+                rule_frame['Angle'] = population['Angle'].apply(pd.Series)
                 rule_frame.sort_values(
                     by=['Ratio'], ascending=False, inplace=True)
 
             best_area.append(
                 [i+1, population[GA_params.get('fitness_metric')].iloc[0]])
+
+            test_arr[:] = [best_area]
 
             top_gens.append(list(population.iloc[0, :]))
             all_gens = all_gens + population.values.tolist()
@@ -436,13 +489,16 @@ if __name__ == "__main__":
                 top_log = population[GA_params.get('fitness_metric')].iloc[0]
                 teller = 0
             else:
-                teller += 1
-                if teller >= GA_params.get('patience'):
-                    stop_crit = True
-                    curses.endwin()
-                    sys.stdout.write('Stopping criteria reached!')
+                if np.amax(top_log) >= total_achievable:
+                    teller += 1
+                    if teller >= GA_params.get('patience'):
+                        stop_crit = True
+                        if use_curses:
+                            curses.endwin()
+                        sys.stdout.write('Stopping criteria reached!')
 
             i += 1
+            gc.collect()
 
         top_gens_frame = pd.DataFrame(top_gens[1:], columns=top_gens[0])
         all_gens_frame = pd.DataFrame(all_gens[1:], columns=all_gens[0])

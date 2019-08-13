@@ -403,6 +403,33 @@ def modify_doc(doc):
             On Tap event registered by Bokeh
         """
 
+        def draw():
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            creature_patch = PolygonPatch(
+                creature_linestring.buffer(0.5))
+
+            ax.add_patch(creature_patch)
+
+            for line in creature_linestring:
+                x, y = line.xy
+                ax.plot(x, y, 'r-', zorder=1)
+
+            for p in env.patches:
+                p = PolygonPatch(p)
+                color = np.random.rand(3,)
+                p.set_color(color)
+                p.set_alpha(0.4)
+                ax.add_patch(p)
+
+            ax.autoscale(axis='y')
+            ax.axis('equal')
+            ax.plot(0, 0, 'xr')
+
+            # plt.draw()
+            # fig.canvas.draw_idle()
+            # plt.pause(1)
+
         clear()
 
         if len(scatter.selected.indices) > 0:
@@ -488,30 +515,6 @@ def modify_doc(doc):
             else:
                 creature_linestring = LineString(coords[:, 0:2])
 
-            fig = plt.figure()
-            ax = fig.add_subplot(111)
-            creature_patch = PolygonPatch(
-                creature_linestring.buffer(0.5))
-
-            ax.add_patch(creature_patch)
-
-            for line in creature_linestring:
-                x, y = line.xy
-                ax.plot(x, y, 'r-', zorder=1)
-            
-            for p in env.patches:
-                p = PolygonPatch(p)
-                color = np.random.rand(3,)
-                p.set_color(color)
-                p.set_alpha(0.4)
-                ax.add_patch(p)
-
-            ax.autoscale(axis='y')
-            ax.axis('equal')
-            # plt.draw()
-            # fig.canvas.draw_idle()
-            # plt.pause(1)
-
             if 'F' in rules[0]:
                 r_1_coords = to_coords(rules[0], creature['Angle'])
 
@@ -551,7 +554,9 @@ def modify_doc(doc):
                 dists['M'].append(c_string.count('-', start, end))
             [dists['x'].append(i) for i in range(1, bins+1)]
             dist.data = dists
-            plt.show()
+            draw()
+            plt.pause(3)
+            # plt.show()
 
         else:
             clear()
@@ -657,5 +662,6 @@ def main():
         print("Opening Bokeh application on http://localhost:5006/")
         server.show('/app')
         io_loop.start()
+
 
 main()
