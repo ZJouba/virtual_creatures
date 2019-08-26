@@ -35,21 +35,32 @@ def genPop(GA_params, predef_rules=None, listed=False):
         rule_B = ''.join([np.random.choice(GA_params.get('choices'))
                           for _ in range(GA_params.get('rule_length'))])
         GA_params['rules'] = {'X': {1: rule_A, 2: rule_B}}
+
+        map_dict = {'F': np.random.choice(['Y', 'N'])}
+
+        joints_A = ' '.join([map_dict.get(c, '') for c in rule_A])
+        joints_B = ' '.join([map_dict.get(c, '') for c in rule_B])
+        GA_params['joints'] = {'X': {1: joints_A, 2: joints_B}}
     else:
         if GA_params.get('pairwise'):
             GA_params['rules'] = {'X': {
                 1: predef_rules[0],
                 2: predef_rules[1]
             }}
+            GA_params['joints'] = {
+                'X': {1: predef_rules[4], 2: predef_rules[5]}}
         else:
             GA_params['rules'] = {'X': {
                 1: predef_rules,
                 2: predef_rules
             }}
+            GA_params['joints'] = {
+                'X': {1: predef_rules[4], 2: predef_rules[5]}}
+
         if predef_rules[2] == 'random':
             GA_params['angle'] = 'random'
         else:
-            GA_params['angle'] = degrees(predef_rules[2])
+            GA_params['angle'] = degrees(predef_rules[3])
 
     # if GA_params.get('angle') == 'random':
     #     GA_params['angle'] = np.random.randint(0, 90)
@@ -73,23 +84,23 @@ def genPop(GA_params, predef_rules=None, listed=False):
 
 def firstRun(iter, GA_params):
 
-    # if GA_params.get('angle') == 'random':
-    #     GA_params['angle'] = np.random.randint(0, 90)
-    #     init_creature = genPop(GA_params, listed=True)
-    #     GA_params['angle'] = 'random'
-    # elif GA_params.get('angle') == 'learnable':
-
-    # else:
-    #     init_creature = genPop(GA_params, listed=True)
-
-    init_creature = genPop(GA_params, listed=True)
+    for _ in range(50):
+        init_creature = genPop(GA_params, listed=True)
 
     population = [init_creature]
 
-    with mp.Pool(num_cores) as pool:
-        result = list(
-            tqdm.tqdm(pool.imap(genPop, repeat(GA_params, 100)), total=100))
-        population = population + result
+    if num_cores > 1:
+        try:
+            with mp.Pool(num_cores) as pool:
+                result = list(
+                    tqdm.tqdm(pool.imap(genPop, repeat(GA_params, iter)), total=iter))
+                population = population + result
+        except:
+            traceback.print_exc()
+    else:
+        for _ in range(iter):
+            result = list(genPop(GA_params))
+            population.append(result)
 
     return population
 
@@ -132,52 +143,102 @@ def selection(population, iter):
         """ ELITE """
         for i in range(elite):
             next_gen.append(
-                list(population[['Rule A', 'Rule B', 'Angle']].iloc[i]))
+                list(population.iloc[i]))
 
         """ RANDOM """
         random_no = int(total * random)
+
+        map_dict = {'F': np.random.choice(['Y', 'N'])}
+
         for _ in range(random_no):
+
+            rule_A = ''.join([np.random.choice(GA_params.get('choices'))
+                              for _ in range(GA_params.get('rule_length'))])
+            rule_B=''.join([np.random.choice(GA_params.get('choices'))
+                                for _ in range(GA_params.get('rule_length'))])
+
+            joints_A = ' '.join([map_dict.get(c, '') for c in rule_A])
+            joints_B = ' '.join([map_dict.get(c, '') for c in rule_B])
+
             next_gen.append([
-                (''.join([np.random.choice(GA_params.get('choices'))
-                          for _ in range(GA_params.get('rule_length'))])),
-                (''.join([np.random.choice(GA_params.get('choices'))
-                          for _ in range(GA_params.get('rule_length'))])),
+                rule_A,
+                rule_B,
                 'random',
+                0,
+                joints_A,
+                joints_B,
             ])
 
         """ MUTATION """
         mut_no = int(total * mutation)
         for i in range(mut_no):
+
+            ind = np.random.randint(0, total)
+
             mutatee_1, mutatee_2 = population[[
-                'Rule A', 'Rule B']].iloc[np.random.randint(0, total)]
+                'Rule A', 'Rule B']].iloc[ind]
             mutatee_1, mutatee_2 = list(mutatee_1), list(mutatee_2)
             index_1 = np.random.randint(low=0,
                                         high=len(mutatee_1), size=int(len(mutatee_1)*0.2))
             index_2 = np.random.randint(low=0,
                                         high=len(mutatee_2), size=int(len(mutatee_2)*0.2))
+
+            joint_A = list(population['Joint A'].iloc[ind])
+            joint_B = list(population['Joint B'].iloc[ind])
+            while len(joint_A) < 5:
+                joint_A.insert(0, ' ')
+            while len(joint_B) < 5:
+                joint_B.insert(0, ' ')
+
             for i, j in zip(index_1, index_2):
-                mutatee_1[i] = np.random.choice(GA_params.get('choices'))
+                char_1 = np.random.choice(GA_params.get('choices'))
+                if char_1 == 'F':
+                    joint_A[i] = np.random.choice(['Y', 'N'])
+                mutatee_1[i] = char_1
+
+                char_2 = np.random.choice(GA_params.get('choices'))
+                if char_2 == 'F':
+                    joint_B[j] = np.random.choice(['Y', 'N'])
                 mutatee_2[j] = np.random.choice(GA_params.get('choices'))
+
             next_gen.append([
                 ''.join(mutatee_1),
                 ''.join(mutatee_2),
                 'random',
+                0,
+                ''.join(joint_A),
+                ''.join(joint_B),
             ])
 
         """ CROSSOVER """
         while len(next_gen) < total:
+
+            ind_1 = np.random.choice(
+                population.index, p=probabilities)
+            ind_2 = np.random.choice(
+                population.index, p=probabilities)
+
             parent_1_A, parent_1_B = population[[
-                'Rule A', 'Rule B']].iloc[np.random.choice(
-                    population.index, p=probabilities)]
+                'Rule A', 'Rule B']].iloc[ind_1]
             parent_2_A, parent_2_B = population[[
-                'Rule A', 'Rule B']].iloc[np.random.choice(
-                    population.index, p=probabilities)]
+                'Rule A', 'Rule B']].iloc[ind_2]
+
+            joint_1_A, joint_1_B = population[[
+                'Joint A', 'Joint B']].iloc[ind_1]
+            joint_2_A, joint_2_B = population[[
+                'Joint A', 'Joint B']].iloc[ind_2]
+
             index_1 = np.random.randint(0, len(parent_1_A))
             index_2 = np.random.randint(0, len(parent_2_A))
+
             child_1 = parent_1_A[:index_1] + parent_2_A[index_1:]
             child_2 = parent_1_B[:index_2] + parent_2_B[index_2:]
+
+            joint_1 = joint_1_A[:index_1] + joint_2_A[index_1:]
+            joint_2 = joint_1_B[:index_2] + joint_2_B[index_2:]
+
             next_gen.append([
-                child_1, child_2, 'random',
+                child_1, child_2, 'random', 0, joint_1, joint_2
             ])
     else:
         total_fitness = sum(population[GA_params.get('fitness_metric')].values)
@@ -205,9 +266,9 @@ def selection(population, iter):
         for i in range(mut_no):
             mutatee = list(
                 population['Rule'].iloc[np.random.randint(0, total)])
-            index = np.random.randint(low=0,
+            index_values = np.random.randint(low=0,
                                       high=len(mutatee), size=int(len(mutatee)*0.2))
-            for i in index:
+            for i in index_values:
                 mutatee[i] = np.random.choice(GA_params.get('choices'))
 
             next_gen.append(
@@ -229,14 +290,34 @@ def selection(population, iter):
     return next_gen
 
 
+def genRuleFrame(population):
+    if GA_params.get('pairwise'):
+        rule_frame = population['Rules'].apply(pd.Series)
+        rule_frame.columns = ['Rule A', 'Rule B']
+        rule_frame[[GA_params.get(
+            'fitness_metric')]] = population[GA_params.get(
+                'fitness_metric')].apply(pd.Series)
+        rule_frame['Angle'] = population['Angle'].apply(pd.Series)
+        rule_frame[['Joint A', 'Joint B']] = population['Joints'].apply(
+            lambda x: list(x.get('X').values())).apply(pd.Series)
+    else:
+        rule_frame = pd.DataFrame(
+            population['Rules'].apply(pd.Series).values.ravel())
+        rule_frame.columns = ['Rule']
+        rule_frame['Joint'] = population['Joints'].apply(
+            lambda x: list(x.get('X').values())).apply(pd.Series).values.ravel()
+        rule_frame['Ratio'] = population['Ratio'].apply(
+            pd.Series).values.ravel()
+        rule_frame['Angle'] = population['Angle'].apply(pd.Series)
+        rule_frame.sort_values(by=['Ratio'], ascending=False, inplace=True)
+
+    return rule_frame
+
+
 def plotter(frame, line, best_area, value_arr):
-    # value_arr = np.asarray(best_area)
-    value_arr[:] = [best_area]
-    try:
-        value_arr = value_arr.T
-    except:
-        pass
-    line.set_data(value_arr)
+    data = np.array(best_area)
+
+    line.set_data(data[:, 0], data[:, 1])
     fig = plt.gcf()
     ax = fig.axes[0]
     ax.relim()
@@ -247,7 +328,7 @@ def plotter(frame, line, best_area, value_arr):
 def plotting(fig, line, best_area):
     value_arr = np.empty(2, dtype=object)
     ani = FuncAnimation(fig, plotter, fargs=(
-        line, best_area, value_arr, ), interval=200, save_count=1)
+        line, best_area, value_arr, ), interval=1000, save_count=1)
     if len(best_area) > 100:
         ani.event_source.interval = 500
 
@@ -261,9 +342,11 @@ if __name__ == "__main__":
 
     global GA_params, num_cores
 
+    num_cores = 2  # mp.cpu_count() - 2
+
     GA_params = {
         'chars': 500,
-        'recurs': 5,
+        'recurs': 3,
         'variables': 'X',
         'constants': 'F+-[]_',
         'axiom': 'FX',
@@ -272,15 +355,16 @@ if __name__ == "__main__":
         'learnable': True,
         'prune': False,
         'pairwise': True,
+        'achievement': 'Best', # 'Best', 'Maximum'
         'rule_length': 5,
         'fitness_metric': 'Area',
-        'patience': 100,
-        'shape': 'rainbow',  # 'circle' 'square' 'rainbow' 'triangle' 'patches' 'uniform'
-        'richness': 'scarce',  # 'scarce' 'common' 'abundant'
-        'scale': 'medium',  # 'small' 'medium' 'large'
+        'patience': 5,
+        'shape': 'patches',  # 'circle' 'square' 'rainbow' 'triangle' 'patches' 'uniform'
+        'richness': 'abundant',  # 'scarce' 'common' 'abundant'
+        'scale': 'small',  # 'small' 'medium' 'large'
     }
 
-    use_curses = False
+    use_curses = True
     total_achievable = 0
 
     """ -------- PATHS AND FILE NAMES ---------- """
@@ -309,33 +393,32 @@ if __name__ == "__main__":
 
     GA_params['env'] = env
 
-    fig, ax = plt.subplots()
+    # fig, ax = plt.subplots()
 
-    for p in env.patches:
-        ax.add_patch(PolygonPatch(p))
-    ax.plot(0, 0, 'xr')
-    plt.autoscale()
-    plt.show()
+    # for p in env.patches:
+    #     ax.add_patch(PolygonPatch(p))
+    # ax.plot(0, 0, 'xr')
+    # plt.autoscale()
+    # plt.show()
 
     GA_params['choices'] = list(GA_params.get(
         'variables') + GA_params.get('constants'))
 
-    best_area = manager.list([[0, 0]])
-
-    num_cores = mp.cpu_count() - 2
+    best_area = manager.list()
+    best_area.append((0,0))
 
     fig, ax = plt.subplots()
     ax.set_xlabel('Generation')
     ax.set_ylabel(GA_params.get('fitness_metric'))
     ax.grid()
     if total_achievable > 0:
-        ax.axhline(total_achievable, linewidth=4, color='r')
+        ax.axhline(total_achievable, linewidth=4, color='grey')
         plt.text(0, total_achievable+0.1, 'Total available area')
-    line, = plt.plot(best_area[0][0], best_area[0][1], 'r-')
+    line, = plt.plot(0, 0, 'r-', alpha=0.8)
 
     plot_proc = mp.Process(target=plotting, args=(fig, line, best_area,))
 
-    pop_size = [200]
+    pop_size = [10]
 
     for pop in pop_size:
         population = firstRun(pop, GA_params)
@@ -349,26 +432,7 @@ if __name__ == "__main__":
 
         population.reset_index(inplace=True, drop=True)
 
-        if GA_params.get('pairwise'):
-            # rule_frame = population['Rules'].apply(pd.Series)
-            # rule_frame.columns = ['Rule A', 'Rule B']
-            # rule_frame[['Ratio A', 'Ratio B']
-            #            ] = population['Ratio'].apply(pd.Series)
-            rule_frame = population['Rules'].apply(pd.Series)
-            rule_frame.columns = ['Rule A', 'Rule B']
-            rule_frame[[GA_params.get(
-                'fitness_metric')]] = population[GA_params.get(
-                    'fitness_metric')].apply(pd.Series)
-            rule_frame['Angle'] = population['Angle'].apply(pd.Series)
-
-        else:
-            rule_frame = pd.DataFrame(
-                population['Rules'].apply(pd.Series).values.ravel())
-            rule_frame.columns = ['Rule']
-            rule_frame['Ratio'] = population['Ratio'].apply(
-                pd.Series).values.ravel()
-            rule_frame['Angle'] = population['Angle'].apply(pd.Series)
-            rule_frame.sort_values(by=['Ratio'], ascending=False, inplace=True)
+        rule_frame = genRuleFrame(population)
 
         sys.stdout.write('Done! \n')
 
@@ -403,25 +467,42 @@ if __name__ == "__main__":
                 stdscr.addstr(0, 0, 'Iteration: {}\r'.format(i))
                 stdscr.refresh()
 
-            result_list = []
-
             new_gen = selection(rule_frame, i)
             start = time.time()
 
-            with mp.Pool(num_cores) as pool:
-                func = partial(genPop, GA_params)
-                """ WITH PROGRESSBARS """
-                # result = list(tqdm.tqdm(pool.imap_unordered(func, new_gen), total=len(new_gen), file=sys.stdout))
-                """ WITHOUT PROGRESSBARS """
-                if use_curses:
-                    stdscr.addstr(1, 0, 'Busy...')
-                    stdscr.clrtoeol()
-                    stdscr.refresh()
-                result = list(pool.imap_unordered(func, new_gen))
-                if use_curses:
-                    stdscr.addstr(1, 0, 'Done')
-                    stdscr.clrtoeol()
-                    stdscr.refresh()
+            if num_cores > 1:
+                try:
+                    """ -------------- MULTIPROCESSING ---------------------- """
+                    with mp.Pool(num_cores) as pool:
+                        func = partial(genPop, GA_params)
+                        """ WITH PROGRESSBARS """
+                        # result = list(tqdm.tqdm(pool.imap_unordered(func, new_gen), total=len(new_gen), file=sys.stdout))
+                        """ WITHOUT PROGRESSBARS """
+                        if use_curses:
+                            stdscr.addstr(1, 0, 'Busy...')
+                            stdscr.clrtoeol()
+                            stdscr.refresh()
+                        result = list(pool.imap_unordered(func, new_gen))
+                        if use_curses:
+                            stdscr.addstr(1, 0, 'Done')
+                            stdscr.clrtoeol()
+                            stdscr.refresh()
+                except:
+                    traceback.print_exc()
+
+            else:
+                """ -------------- NORMAL ---------------------- """
+                result = []
+                for dna in new_gen:
+                    if use_curses:
+                        stdscr.addstr(1, 0, 'Busy...')
+                        stdscr.clrtoeol()
+                        stdscr.refresh()
+                    result.append(list(genPop(GA_params, dna)))
+                    if use_curses:
+                        stdscr.addstr(1, 0, 'Done')
+                        stdscr.clrtoeol()
+                        stdscr.refresh()
 
             end = time.time()
 
@@ -431,41 +512,20 @@ if __name__ == "__main__":
 
             if use_curses:
                 stdscr.addstr(
-                    2, 0, 'Running average class time: \t {:.5f} seconds'.format(avg))
+                    2, 0, 'Running average class time: \t {:.5f} second'.format(avg))
 
-            pool.join()
+            if num_cores > 1:
+                pool.join()
 
             population.iloc[:, :] = result
 
             population.sort_values(by=GA_params.get(
                 'fitness_metric'), ascending=False, inplace=True)
 
-            if GA_params.get('pairwise'):
-                # rule_frame = population['Rules'].apply(pd.Series)
-                # rule_frame.columns = ['Rule A', 'Rule B']
-                # rule_frame[['Ratio A', 'Ratio B']
-                #            ] = population['Ratio'].apply(pd.Series)
-                rule_frame = population['Rules'].apply(pd.Series)
-                rule_frame.columns = ['Rule A', 'Rule B']
-                rule_frame[[GA_params.get(
-                    'fitness_metric')]] = population[GA_params.get(
-                        'fitness_metric')].apply(pd.Series)
-                rule_frame['Angle'] = population['Angle'].apply(pd.Series)
-
-            else:
-                rule_frame = pd.DataFrame(
-                    population['Rules'].apply(pd.Series).values.ravel())
-                rule_frame.columns = ['Rule']
-                rule_frame['Ratio'] = population['Ratio'].apply(
-                    pd.Series).values.ravel()
-                rule_frame['Angle'] = population['Angle'].apply(pd.Series)
-                rule_frame.sort_values(
-                    by=['Ratio'], ascending=False, inplace=True)
+            rule_frame = genRuleFrame(population)
 
             best_area.append(
-                [i+1, population[GA_params.get('fitness_metric')].iloc[0]])
-
-            test_arr[:] = [best_area]
+                (i+1, population[GA_params.get('fitness_metric')].iloc[0]))
 
             top_gens.append(list(population.iloc[0, :]))
             all_gens = all_gens + population.values.tolist()
@@ -489,7 +549,15 @@ if __name__ == "__main__":
                 top_log = population[GA_params.get('fitness_metric')].iloc[0]
                 teller = 0
             else:
-                if np.amax(top_log) >= total_achievable:
+                if GA_params['achievement'] == 'Maximum':
+                    if (total_achievable*0.8) >= np.amax(top_log) >= total_achievable:
+                        teller += 1
+                        if teller >= GA_params.get('patience'):
+                            stop_crit = True
+                            if use_curses:
+                                curses.endwin()
+                            sys.stdout.write('Stopping criteria reached!')
+                else:
                     teller += 1
                     if teller >= GA_params.get('patience'):
                         stop_crit = True

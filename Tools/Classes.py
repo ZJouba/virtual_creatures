@@ -1,14 +1,26 @@
 import numpy as np
 # LinearRing, LineString, MultiLineString, Point, Polygon, box
 from shapely.geometry import *
-from shapely.ops import unary_union
+from shapely import ops, affinity
 from math import radians, cos, sin, pi
 import re
 import random
+import time
 from descartes.patch import PolygonPatch
 from matplotlib.patches import Circle, Wedge
 from matplotlib import pyplot as plt
 import matplotlib as mpl
+import multiprocessing as mp
+import traceback
+
+from pathos.multiprocessing import ProcessPool
+
+
+def buffer_line(line):
+    # while True:
+    #     line = in_queue.get()
+    #     out_queue.put(Polygon(line.buffer(0.5)))
+    return Polygon(line.buffer(0.5))
 
 
 class Creature:
@@ -45,6 +57,8 @@ class Creature:
         self.L_string = params.get('axiom')
         self.Constants = params.get('constants')
         self.Variables = params.get('variables')
+        self.Joints = params.get('joints')
+        self.Joint_string = list(' ')
 
         if params.get('angle') == 'random':
             self.Angle = radians(np.random.randint(0, 90))
@@ -52,11 +66,17 @@ class Creature:
             self.Angle = radians(params.get('angle'))
 
         self.recur(params.get('recurs'))
+
+        self.Joint_string = re.sub('[^YN]', '', self.Joint_string)
+
         self.Length = params.get('length')
         self.env = params.get('env')
         self.mapper()
         self.tolines()
-        self.morphology()
+
+        self.create_body()
+
+        self.absorb_area()
         self.results()
 
     def recur(self, iters):
@@ -66,6 +86,9 @@ class Creature:
             else:
                 self.L_string = ''.join([self.next_char(c)
                                          for c in self.L_string])
+
+        self.Joint_string = ''.join(
+            [self.Joints['X'].get(i+1) for i in self.Choices])
 
         if self.Params.get('prune'):
             self.L_string = self.L_string[:500]
@@ -80,14 +103,6 @@ class Creature:
 
         return d[r+1]
 
-        # rule = self.Rules.get(c, c)
-        # if not rule == c:
-        #     key, choice = random.choice(list(self.Rules.get(c).items()))
-        #     self.Choices.append(key)
-        #     return choice
-        # else:
-        #     return rule
-
     def mapper(self):
         """Converts L-string to coordinates
 
@@ -99,8 +114,10 @@ class Creature:
 
         num_chars = len(self.L_string)
 
-        coords = np.zeros((num_chars + 1, 4), np.double)
-        nodes = np.zeros((1, 4), np.double)
+        coords = np.zeros((num_chars + 1, 7), dtype=object)
+        nodes = np.zeros_like(coords)
+
+        coords[0, 4:7] = ('N', 0, 0)
 
         rotVec = np.array((
             (cos(self.Angle), -sin(self.Angle), 0),
@@ -112,6 +129,8 @@ class Creature:
         curr_vec = start_vec
         i = 1
 
+        joints = list(self.Joint_string)
+
         for c in self.L_string:
             """
             1: Node
@@ -119,7 +138,16 @@ class Creature:
             3: Saved
             """
             if c == 'F':
+                if i == 1:
+                    coords[i, 4:7] = ('N', 0, 0)
+                else:
+                    try:
+                        coords[i, 4:7] = (joints.pop(0), 45, 0)
+                    except:
+                        pass
+
                 coords[i, :3] = (coords[i-1, :3] + (self.Length * curr_vec))
+
                 i += 1
 
             if c == '-':
@@ -130,16 +158,19 @@ class Creature:
 
             if c == '[':
                 nodes = np.vstack((nodes, coords[i-1]))
-                coords[i-1, 3] = 3
-                nodes[-1, 3] = 1
+                # coords[i-1, 3] = 3
+                # nodes[-1, 3] = 1
+                coords[i-1, 3] = 'SAVED'
+                nodes[-1, 3] = 'NODE'
 
             if c == ']':
-                if coords[i-1, 3] == 1:
+                if coords[i-1, 3] == 'NODE':  # coords[i-1, 3] == 1:
                     # coords[i, 3] = 2
                     coords[i-1] = nodes[-1]
                     # i += 1
                 else:
-                    coords[i-1, 3] = 2
+                    # coords[i-1, 3] = 2
+                    coords[i-1, 3] = 'BRANCH'
                     if len(nodes) == 1:
                         coords[i] = nodes[-1]
                     else:
@@ -162,16 +193,181 @@ class Creature:
 
         j = 0
         for i in range(len(self.Coords)):
-            if (self.Coords[i, 3] == 2) or (i == (len(self.Coords) - 1)):
-                lines.append(self.Coords[j:i+1, :2].tolist())
+            if (self.Coords[i, 3] == 'BRANCH') or (i == (len(self.Coords) - 1)):
+                lines.append(self.Coords[j:i+1].tolist())
                 j = i+1
 
         if not lines:
-            self.Lines = [self.Coords[:, :3]]
+            self.Lines = [self.Coords[:]]
         else:
             self.Lines = [line for line in lines if len(line) > 1]
 
-    def morphology(self):
+    def create_body(self):
+        lines = []
+        Vs = []
+        all_r_lines = []
+
+        for line in self.Lines:
+            line = np.asarray(line, dtype=object)
+            cumm = 0
+            indi_coords = []
+
+            for i, joint in enumerate(line):
+
+                if joint[4] == 'Y' and joint[3] != 'BRANCH':
+
+                    """ --------------- BODY -------------------------------- """
+                    indi_coords.append((joint[0], joint[1]))
+                    # if np.sign(joint[0]) < 0:
+                    #     ax.annotate(
+                    #         'Revolve @ ' + str(joint[3]) + ' degrees',
+                    #         xy=(joint[0], joint[1]),
+                    #         xytext=(np.sign(joint[0])*200, 0),
+                    #         textcoords="offset points",
+                    #         arrowprops=dict(arrowstyle="->", color="0.5",),
+                    #         ha='right',
+                    #     )
+                    # else:
+                    #     ax.annotate(
+                    #         'Revolve @ ' + str(joint[3]) + ' degrees',
+                    #         xy=(joint[0], joint[1]),
+                    #         xytext=(np.sign(joint[0])*200, 0),
+                    #         textcoords="offset points",
+                    #         arrowprops=dict(arrowstyle="->", color="0.5",),
+                    #         ha='left',
+                    #     )
+
+                    # new_coords = ((line[i+1][0]), (line[i+1][1]))
+                    # angle = degrees(atan2(
+                    #     (new_coords[1] - joint[1]),
+                    #     (new_coords[0] - joint[0])
+                    # ))
+
+                    if cumm > 0:
+                        loc = np.where(np.all(joint == self.Coords, axis=1))
+                        self.Coords[loc, 6] = cumm
+
+                    cumm += 1
+
+                else:
+                    indi_coords.append((joint[0], joint[1]))
+                    cumm = 0
+
+            lines.append(np.asarray(indi_coords))
+
+        if len(lines) > 1:
+            self.Linestring = MultiLineString(lines)
+        else:
+            self.Linestring = LineString(self.Coords[:, :2])
+
+        for i, joint in reversed(list(enumerate(self.Coords))):
+
+            if joint[4] == 'Y' and i < (len(self.Coords)-1) and joint[3] != 'BRANCH':
+
+                if joint[6] > 0:
+                    """ --------------- PATCH -------------------------------- """
+                    lineA = LineString([(joint[0], joint[1]),
+                                        ((self.Coords[i+1][0]), (self.Coords[i+1][1]))])
+                    left_line = affinity.rotate(
+                        lineA, joint[5]/2, (joint[0], joint[1]))
+                    rigt_line = affinity.rotate(
+                        lineA, -joint[5]/2, (joint[0], joint[1]))
+
+                    try:
+                        Vs[-1] = ops.unary_union([MultiLineString(
+                            [lineA, left_line, rigt_line])] + all_r_lines[-1])
+                    except:
+                        Vs.append(MultiLineString(
+                            [lineA, left_line, rigt_line]))
+
+                    """ --------------- ANGLE LINES -------------------------------- """
+
+                    rotate_angle = self.Coords[i-1][5]/2
+                    r_lines = [affinity.rotate(
+                        Vs[-1],
+                        j,
+                        (self.Coords[i-1][0], self.Coords[i-1][1])
+                    ) for j in np.linspace(-rotate_angle, rotate_angle, num=3)
+                    ]
+
+                    all_r_lines += [r_lines]
+
+                    Vs[-1] = ops.unary_union([Vs[-1]] + r_lines)
+
+                else:
+                    """ --------------- PATCH -------------------------------- """
+                    lineA = LineString([(joint[0], joint[1]),
+                                        ((self.Coords[i+1][0]), (self.Coords[i+1][1]))])
+                    left_line = affinity.rotate(
+                        lineA, joint[5]/2, (joint[0], joint[1]))
+                    rigt_line = affinity.rotate(
+                        lineA, -joint[5]/2, (joint[0], joint[1]))
+
+                    Vs.append(MultiLineString(
+                        [lineA, left_line, rigt_line]))
+
+        all_r_lines = [item for sublist in all_r_lines for item in sublist]
+
+        all_lines = Vs
+
+        a = ops.unary_union(all_lines).simplify(0)
+
+        creature = ops.unary_union([a] + [self.Linestring]).simplify(0)
+
+        if isinstance(creature, MultiLineString):
+
+            pieces = []
+            for piece in creature:
+                pieces.append(piece)
+
+            try:
+                with ProcessPool(nodes=2) as pool:
+                    result = list(pool.uimap(buffer_line, pieces))
+            except:
+                traceback.print_exc()
+
+            piece_polygon = ops.unary_union(result)
+
+            self.absorbA = piece_polygon
+
+        else:
+            self.absorbA = creature.buffer(self.Length/2)
+
+        self.moves = Vs
+
+        # fig, ax = plt.subplots(2, 1)
+
+        # c_patch = PolygonPatch(creature.buffer(0.5), fc='BLACK', alpha=0.1)
+
+        # ax.add_patch(c_patch)
+
+        # try:
+        #     for c_l in self.Linestring:
+        #         x, y = c_l.xy
+        #         ax[0].plot(x, y, 'r-')
+        # except:
+        #     x, y = self.Linestring.xy
+        #     ax[0].plot(x, y, 'r-')
+
+        # for m in all_lines:
+        #     for line in m:
+        #         x, y = line.xy
+        #         ax[0].plot(x, y, 'g--', alpha=0.25)
+
+        # ax[0].axis('equal')
+
+        # try:
+        #     for line in creature:
+        #         x, y = line.xy
+        #         ax[1].plot(x, y)
+        # except:
+        #     x, y = creature.xy
+        #     ax[1].plot(x, y)
+
+        # ax[1].axis('equal')
+        # plt.show()
+
+    def absorb_area(self):
         """Converts coordinates or lines to shapely object and buffers
 
         Returns
@@ -180,19 +376,19 @@ class Creature:
             L-creature "body"
         """
 
-        if len(self.Lines) > 1:
-            self.Linestring = MultiLineString(self.Lines)
-        else:
-            self.Linestring = LineString(self.Coords[:, :2])
+        # if len(self.Lines) > 1:
+        #     self.Linestring = MultiLineString(self.Lines)
+        # else:
+        #     self.Linestring = LineString(self.Coords[:, :2])
 
-        self.absorbA = self.Linestring.buffer(self.Length/2)
+        # self.absorbA = self.Linestring.buffer(self.Length/2)
 
         self.Area = 0
         if not self.env.patches:
             self.Area = self.absorbA.area
         else:
             for patch in self.env.patches:
-                p = PolygonPatch(patch)  # * patch._alpha)
+                # p = PolygonPatch(patch)  # * patch._alpha)
                 self.Area += (self.absorbA.intersection(patch).area)
 
         self.Bounds = self.Linestring.bounds
@@ -223,6 +419,8 @@ class Creature:
                                                 for s in re.findall(r'[' + char + ']+', self.L_string)))
             except:
                 setattr(self, 'Max' + char, 0)
+
+        self.JointNo = self.Joint_string.count('Y')
 
         self.Comp = np.linalg.norm(self.Bounds)
 
@@ -267,7 +465,7 @@ class Environment:
         radius = (1 * self.scale)
 
         if self.shape == 'circle':
-            width = self.richness
+            # width = self.richness
             center = (0, 0)
             radius = (2 * self.scale)
             ring = Wedge(center, radius, 0, 360)
@@ -311,8 +509,14 @@ class Environment:
         if self.shape == 'patches':
             radii = radius * \
                 np.random.dirichlet(np.ones(self.richness), 1)
+
+            coords = np.random.random((len(radii[0]), 2))
+
+            for i in np.random.randint(0, len(coords), 4):
+                coords[i] = coords[i] * -1
+
             for rad in radii[0]:
-                coords = self.scale * 10 * \
+                coords = self.scale * \
                     np.array([np.random.uniform(-1, 1),
                               np.random.uniform(-1, 1)])
                 patch = Point(coords).buffer(rad)

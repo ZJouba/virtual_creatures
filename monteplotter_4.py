@@ -34,9 +34,12 @@ from bokeh.transform import log_cmap
 from descartes.patch import PolygonPatch
 from nltk.util import ngrams
 from shapely.geometry import LineString, MultiLineString
+from shapely import ops
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from tabulate import tabulate
 from tornado.ioloop import IOLoop
+
+from Tools.Gen_Tools import plot_creature
 
 def preProcessing(allData):
     
@@ -60,29 +63,17 @@ def preProcessing(allData):
         allData['Angle'] = allData['Angle'].apply(lambda x: x*(180/pi))
     except:
         pass
-    overlap = []
-    linestrings = []
-    for _, creature in allData.iterrows():
-        if 'Lines' in allData:
-            lines = creature['Lines']
-            linestrings.append(MultiLineString(lines))
-            overlap.append(1 - creature['Area'] /
-                           (linestrings[-1].length))
-        else:
-            coords = creature['Coords']
-            linestrings.append(LineString(coords[:, 0:2]))
-            overlap.append(1 - creature['Area'] /
-                           (linestrings[-1].length+0.785))
 
-    allData['Line Strings'] = linestrings
-    allData['% Overlap'] = overlap
-    allData['Centroid_X'] = allData['Line Strings'].apply(
+    allData['% Overlap'] = allData.apply(
+        lambda x: ((1 - x['Area']) / (x['Linestring'].length + 0.785)),
+    axis=1)
+    allData['Centroid_X'] = allData['Linestring'].apply(
         lambda x: x.centroid.x)
-    allData['Centroid_Y'] = allData['Line Strings'].apply(
+    allData['Centroid_Y'] = allData['Linestring'].apply(
         lambda x: x.centroid.y)
     allData['Compactness'] = allData['Bounds'].apply(
         lambda x: np.linalg.norm(x))
-    allData['Length'] = allData['Line Strings'].apply(
+    allData['Length'] = allData['Linestring'].apply(
         lambda x: x.length)
 
     scaler = MinMaxScaler(feature_range=(0, 10))
@@ -406,14 +397,26 @@ def modify_doc(doc):
         def draw():
             fig = plt.figure()
             ax = fig.add_subplot(111)
-            creature_patch = PolygonPatch(
-                creature_linestring.buffer(0.5))
+
+            # creature = ops.unary_union([
+            #     ops.unary_union(creature_moves)] + [creature_linestring])
+
+            creature_patch = PolygonPatch(creature['absorbA'], fc='BLACK', alpha=0.1)
 
             ax.add_patch(creature_patch)
 
-            for line in creature_linestring:
-                x, y = line.xy
+            try:
+                for line in creature_linestring:
+                    x, y = line.xy
+                    ax.plot(x, y, 'r-', zorder=1)
+            except:
+                x, y = creature_linestring.xy
                 ax.plot(x, y, 'r-', zorder=1)
+
+            for move in creature_moves:
+                for line in move:
+                    x, y = line.xy
+                    ax.plot(x, y, 'g--', alpha=0.25)
 
             for p in env.patches:
                 p = PolygonPatch(p)
@@ -477,13 +480,19 @@ def modify_doc(doc):
 
             L_string.text = '{}'.format(creature['L_string'])
 
-            gram_frame_1 = pd.DataFrame.from_dict(
-                {'2-gram': creature['2-gram'],
-                 '3-gram': creature['3-gram'],
-                 '4-gram': creature['4-gram'],
-                 '5-gram': creature['5-gram'],
-                 },
-                orient='index').T
+            n_grams = {}
+            for i in range(2, len(creature['Rolling n-grams'])):
+                n_grams[str(i) + '-gram'] = creature[str(i) + '-gram']
+
+            gram_frame_1 = pd.DataFrame.from_dict(n_grams, orient='index').T
+
+            # gram_frame_1 = pd.DataFrame.from_dict(
+            #     {'2-gram': creature['2-gram'],
+            #      '3-gram': creature['3-gram'],
+            #      '4-gram': creature['4-gram'],
+            #      '5-gram': creature['5-gram'],
+            #      },
+            #     orient='index').T
 
             counts = [pd.value_counts(gram_frame_1[i]).reset_index().astype(
                 str).apply(' '.join, 1) for i in gram_frame_1]
@@ -492,13 +501,11 @@ def modify_doc(doc):
             grams_static.text = ('-' * 14) + ' Static n-grams ' + ('-' * 14) + '\n' + str(
                 tabulate(out, headers='keys'))
 
-            gram_frame_2 = pd.DataFrame.from_dict(
-                {'2-gram': creature['Rolling n-grams'][0],
-                 '3-gram': creature['Rolling n-grams'][1],
-                 '4-gram': creature['Rolling n-grams'][2],
-                 '5-gram': creature['Rolling n-grams'][3],
-                 },
-                orient='index').T
+            n_grams = {}
+            for i in range(len(creature['Rolling n-grams'])):
+                n_grams[str(i) + '-gram'] = creature['Rolling n-grams'][i]
+
+            gram_frame_2 = pd.DataFrame.from_dict(n_grams, orient='index').T
 
             counts = [pd.value_counts(gram_frame_2[i]).reset_index().astype(
                 str).apply(' '.join, 1) for i in gram_frame_1]
@@ -510,10 +517,8 @@ def modify_doc(doc):
             coordinates.text = str(
                 tabulate(creature['Coords'], headers='keys'))
 
-            if 'Lines' in creature:
-                creature_linestring = MultiLineString(creature['Lines'])
-            else:
-                creature_linestring = LineString(coords[:, 0:2])
+            creature_linestring = creature['Linestring']
+            creature_moves = creature['moves']
 
             if 'F' in rules[0]:
                 r_1_coords = to_coords(rules[0], creature['Angle'])
@@ -554,9 +559,11 @@ def modify_doc(doc):
                 dists['M'].append(c_string.count('-', start, end))
             [dists['x'].append(i) for i in range(1, bins+1)]
             dist.data = dists
+
             draw()
-            plt.pause(3)
+            plt.pause(5)
             # plt.show()
+            print([line for line in creature['Linestring']])
 
         else:
             clear()
