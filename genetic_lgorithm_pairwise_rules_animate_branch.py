@@ -489,7 +489,9 @@ if __name__ == "__main__":
                             stdscr.refresh()
                 except:
                     traceback.print_exc()
-
+            
+            gc.collect()
+            
             else:
                 """ -------------- NORMAL ---------------------- """
                 result = []
