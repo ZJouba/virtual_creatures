@@ -9,31 +9,45 @@ from descartes.patch import PolygonPatch
 import time
 import pandas as pd
 from adjustText import adjust_text
+from tabulate import tabulate
 
-Coords = np.array([[
+Coords = np.array([
     [0, 0, 0, 0, 'N', 0, 0],
-    [0, 1, 0, 0, 'N', 0, 0],
-    [-0.99452, 0.895472, 0, 0, 'Y', 45, 0],
-    [-1.98904, 0.790943, 0, 3, 'Y', 45, 0],
-    [-2.97385, 0.617295, 0, 0, 'N', 0, 0],
-    [-2.76594, -0.360853, 0, 0, 'N', 0, 0],
-    [-1.79564, -0.118931, 0, 0, 'N', 0, 0],
-]], dtype=object)
+    [0, 1, 0, 'BRANCH', 'N', 0, 0],
+    [0, 0, 0, 'BRANCH', 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0],
+    [-0.85, -0.51, 0, 'BRANCH', 'Y', 45, 0],
+    [-0.85, -0.51, 0, 'NODE', 'Y', 45, 0],
+    [-1.71, -1.03, 0, 0, 'Y', 45, 0],
+    [-1.66, -2.02, 0, 'BRANCH', 'Y', 45, 0],
+    [-1.66, -2.02, 0, 'NODE', 'Y', 45, 0],
+    [-1.60, -3.02, 0, 'BRANCH', 'Y', 45, 0],
+    [0, 0, 0, 0, 0, 0, 0],
+    [0.90, -0.42, 0, 'BRANCH', 'Y', 45, 0],
+    [0.90, -0.42, 0, 'NODE', 'Y', 45, 0],
+    [1.81, -0.84, 0, 'BRANCH', 'Y', 45, 0],
+    [0, 0, 0, 'BRANCH', 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0],
+    [0.10, -0.99, 0, 0, 'Y', 45, 0],
+    [-0.69, -1.59, 0, 0, 'Y', 45, 0],
+    [-0.53, -2.58, 0, 'BRANCH', 'Y', 45, 0],
+    [-0.53, -2.58, 0, 'NODE', 'Y', 45, 0],
+], dtype=object)
 
 lines = []
 
-# j = 0
-# for i in range(len(Coords)):
-#     if (Coords[i, 3] == 2) or (i == (len(Coords) - 1)):
-#         lines.append(Coords[j:i+1].tolist())
-#         j = i+1
+j = 0
+for i in range(len(Coords)):
+    if (Coords[i, 3] == 'BRANCH') or (i == (len(Coords) - 1)):
+        lines.append(Coords[j:i+1].tolist())
+        j = i+1
 
-# if not lines:
-#     Lines = [Coords[:]]
-# else:
-#     Lines = [line for line in lines if len(line) > 1]
+if not lines:
+    Lines = [Coords[:]]
+else:
+    Lines = [line for line in lines if len(line) > 1]
 
-fig, ax = plt.subplots(2, 1)
+fig, ax = plt.subplots()
 
 patches = []
 lines = []
@@ -41,7 +55,8 @@ Vs = []
 all_r_lines = []
 texts = []
 
-for num, line in enumerate(Coords):
+
+for num, line in enumerate(Lines):
     line = np.asarray(line, dtype=object)
     num_coords = line[:, 0:2]
     cumm = 0
@@ -50,7 +65,7 @@ for num, line in enumerate(Coords):
 
     for i, joint in enumerate(line):
 
-        if joint[4] == 'Y':
+        if joint[4] == 'Y' and joint[3] != 'BRANCH':
 
             """ --------------- BODY -------------------------------- """
             indi_coords.append((joint[0], joint[1]))
@@ -80,7 +95,7 @@ for num, line in enumerate(Coords):
             ))
 
             if cumm > 0:
-                Coords[num][i][6] = cumm
+                Lines[num][i][6] = cumm
 
             cumm += 1
 
@@ -92,10 +107,12 @@ for num, line in enumerate(Coords):
 
 linestring = MultiLineString(lines)
 
-for num, line_coords in reversed(list(enumerate(Coords))):
+print(tabulate(Lines))
+
+for num, line_coords in reversed(list(enumerate(Lines))):
     for i, joint in reversed(list(enumerate(line_coords))):
 
-        if joint[4] == 'Y':
+        if joint[4] == 'Y' and i < (len(Coords)-1) and joint[3] != 'BRANCH':
 
             if joint[6] > 0:
                 """ --------------- PATCH -------------------------------- """
@@ -137,46 +154,37 @@ for num, line_coords in reversed(list(enumerate(Coords))):
 
                 Vs.append(MultiLineString([lineA, left_line, rigt_line]))
 
-all_r_lines = [item for sublist in all_r_lines for item in sublist]
+                all_r_lines = []
+
+# all_r_lines = [item for sublist in all_r_lines for item in sublist]
 
 all_lines = Vs
 
 a = ops.unary_union(all_lines)
 
-creature = ops.unary_union([a] + [linestring])
+creature = (Vs + [a] + [linestring])
 
-start = time.time()
-try_list = []
-for line in creature:
-    try_list.append(Polygon(line.buffer(0.5)))
-try_poly = ops.cascaded_union(try_list)
-try_patch = PolygonPatch(try_poly, fc='BLUE', alpha=0.1)
-end = time.time()
+polies = []
+for l in creature:
+    polies.append(Polygon(l.buffer(0.5)))
 
-print(end - start)
-
-start = time.time()
-c_patch = PolygonPatch(creature.buffer(0.5), fc='BLACK', alpha=0.1)
-end = time.time()
-
-print(end - start)
-
-ax[0].add_patch(c_patch)
+creature_poly = ops.unary_union(polies)
+creature_patch = PolygonPatch(creature_poly, fc='BLUE', alpha=0.1)
 
 for c_l in linestring:
     x, y = c_l.xy
-    ax[0].plot(x, y, 'r-')
+    ax.plot(x, y)
 
 for m in all_lines:
     for line in m:
         x, y = line.xy
-        ax[0].plot(x, y, 'g--', alpha=0.25)
+        ax.plot(x, y, 'g--', alpha=0.25)
 
-ax[0].axis('equal')
+ax.axis('equal')
 
-ax[1].add_patch(try_patch)
+ax.add_patch(creature_patch)
 # x, y = try_patch.get_xy()
 # ax[1].plot(x, y, 'r-')
 
-ax[1].axis('equal')
+ax.axis('equal')
 plt.show()

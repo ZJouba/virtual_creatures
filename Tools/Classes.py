@@ -306,32 +306,42 @@ class Creature:
                     Vs.append(MultiLineString(
                         [lineA, left_line, rigt_line]))
 
-        all_r_lines = [item for sublist in all_r_lines for item in sublist]
+                    all_r_lines = []
 
         all_lines = Vs
 
         a = ops.unary_union(all_lines).simplify(0)
 
-        creature = ops.unary_union([a] + [self.Linestring]).simplify(0)
+        creature = (Vs + [a] + [self.Linestring])
 
-        if isinstance(creature, MultiLineString):
+        polies = []
+        for l in creature:
+            polies.append(Polygon(l.buffer(0.5)))
 
-            pieces = []
-            for piece in creature:
-                pieces.append(piece)
+        creature_poly = ops.unary_union(polies)
+        creature_patch = PolygonPatch(creature_poly, fc='BLUE', alpha=0.1)
 
-            try:
-                with ProcessPool(nodes=2) as pool:
-                    result = list(pool.uimap(buffer_line, pieces))
-            except:
-                traceback.print_exc()
+        self.absorbA = creature_poly
 
-            piece_polygon = ops.unary_union(result)
+        # if isinstance(creature, MultiLineString):
 
-            self.absorbA = piece_polygon
+        #     polies = []
+        #     for l in creature:
+        #         polies.append(Polygon(l.buffer(0.5)))
 
-        else:
-            self.absorbA = creature.buffer(self.Length/2)
+        #     # try:
+        #     #     with ProcessPool(nodes=2) as pool:
+        #     #         result = list(pool.uimap(buffer_line, pieces))
+        #     # except:
+        #     #     traceback.print_exc()
+
+        #     creature_poly = ops.unary_union(polies)
+        #     creature_patch = PolygonPatch(creature_poly, fc='BLUE', alpha=0.1)
+
+        #     self.absorbA = creature_poly
+
+        # else:
+        #     self.absorbA = creature.buffer(self.Length/2)
 
         self.moves = Vs
 

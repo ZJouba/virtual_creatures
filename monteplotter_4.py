@@ -561,9 +561,8 @@ def modify_doc(doc):
             dist.data = dists
 
             draw()
-            plt.pause(5)
+            plt.pause(10)
             # plt.show()
-            print([line for line in creature['Linestring']])
 
         else:
             clear()

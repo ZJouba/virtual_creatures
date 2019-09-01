@@ -84,7 +84,7 @@ def genPop(GA_params, predef_rules=None, listed=False):
 
 def firstRun(iter, GA_params):
 
-    for _ in range(50):
+    for _ in range(2):
         init_creature = genPop(GA_params, listed=True)
 
     population = [init_creature]
@@ -355,8 +355,8 @@ if __name__ == "__main__":
         'learnable': True,
         'prune': False,
         'pairwise': True,
-        'achievement': 'Best', # 'Best', 'Maximum'
-        'rule_length': 5,
+        'achievement': 'Maximum', # 'Best', 'Maximum'
+        'rule_length': 4,
         'fitness_metric': 'Area',
         'patience': 5,
         'shape': 'patches',  # 'circle' 'square' 'rainbow' 'triangle' 'patches' 'uniform'
