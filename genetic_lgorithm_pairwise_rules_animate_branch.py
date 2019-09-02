@@ -6,6 +6,7 @@ import sys
 import time
 import inspect
 import gc
+import trace
 from datetime import datetime
 from functools import partial
 from itertools import chain, repeat
@@ -66,6 +67,10 @@ def genPop(GA_params, predef_rules=None, listed=False):
     #     GA_params['angle'] = np.random.randint(0, 90)
 
     # for _ in range(100):
+    tracer = trace.Trace(ignoredirs=[sys.prefix, sys.exec_prefix ], trace=1, count=0, timing=True, countcallers=True)
+    tracer.runfunc(Creature, GA_params)
+    tracer.results().write_results(show_missing=False, coverdir=".")
+
     c = Creature(GA_params)
 
     # done = True
@@ -84,7 +89,7 @@ def genPop(GA_params, predef_rules=None, listed=False):
 
 def firstRun(iter, GA_params):
 
-    for _ in range(2):
+    for _ in range(100):
         init_creature = genPop(GA_params, listed=True)
 
     population = [init_creature]
@@ -342,7 +347,7 @@ if __name__ == "__main__":
 
     global GA_params, num_cores
 
-    num_cores = 2  # mp.cpu_count() - 2
+    num_cores = 4  # mp.cpu_count() - 2
 
     GA_params = {
         'chars': 500,
@@ -355,7 +360,7 @@ if __name__ == "__main__":
         'learnable': True,
         'prune': False,
         'pairwise': True,
-        'achievement': 'Maximum', # 'Best', 'Maximum'
+        'achievement': 0, # 'Best', 'Maximum', Int
         'rule_length': 4,
         'fitness_metric': 'Area',
         'patience': 5,
@@ -364,7 +369,7 @@ if __name__ == "__main__":
         'scale': 'small',  # 'small' 'medium' 'large'
     }
 
-    use_curses = True
+    use_curses = False
     total_achievable = 0
 
     """ -------- PATHS AND FILE NAMES ---------- """
@@ -467,6 +472,7 @@ if __name__ == "__main__":
                 stdscr.addstr(0, 0, 'Iteration: {}\r'.format(i))
                 stdscr.refresh()
 
+            GA_params['Generation'] = i
             new_gen = selection(rule_frame, i)
             start = time.time()
 
@@ -490,7 +496,7 @@ if __name__ == "__main__":
                 except:
                     traceback.print_exc()
             
-            gc.collect()
+                gc.collect()
             
             else:
                 """ -------------- NORMAL ---------------------- """
@@ -547,25 +553,31 @@ if __name__ == "__main__":
                 population.to_csv(os.path.join(
                     curr_dir, 'CSVs/final_pop ' + now + '.csv'))
 
-            if population[GA_params.get('fitness_metric')].iloc[0] > top_log:
-                top_log = population[GA_params.get('fitness_metric')].iloc[0]
-                teller = 0
-            else:
-                if GA_params['achievement'] == 'Maximum':
-                    if (total_achievable*0.8) >= np.amax(top_log) >= total_achievable:
+            if not isinstance(GA_params['achievement'], int):
+                if population[GA_params.get('fitness_metric')].iloc[0] > top_log:
+                    top_log = population[GA_params.get('fitness_metric')].iloc[0]
+                    teller = 0
+                else:
+                    if GA_params['achievement'] == 'Maximum':
+                        if (total_achievable*0.8) >= np.amax(top_log) >= total_achievable:
+                            teller += 1
+                            if teller >= GA_params.get('patience'):
+                                stop_crit = True
+                                if use_curses:
+                                    curses.endwin()
+                                sys.stdout.write('Stopping criteria reached!')
+                    elif GA_params['achievement'] == 'Best':
                         teller += 1
                         if teller >= GA_params.get('patience'):
                             stop_crit = True
                             if use_curses:
                                 curses.endwin()
                             sys.stdout.write('Stopping criteria reached!')
-                else:
-                    teller += 1
-                    if teller >= GA_params.get('patience'):
-                        stop_crit = True
-                        if use_curses:
-                            curses.endwin()
-                        sys.stdout.write('Stopping criteria reached!')
+            elif i >= GA_params['achievement']:
+                stop_crit = True
+                if use_curses:
+                    curses.endwin()
+                sys.stdout.write('Stopping criteria reached!')
 
             i += 1
             gc.collect()

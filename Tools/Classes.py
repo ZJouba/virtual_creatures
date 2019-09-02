@@ -179,6 +179,12 @@ class Creature:
                     i += 1
 
         coords = np.delete(coords, np.s_[i:], 0)
+
+        for ind, line in enumerate(coords):
+            if line[3] == 'BRANCH':
+                if (line[0:3] == coords[ind + 1, 0:3]).all():
+                    np.delete(coords, ind, 0)
+
         self.Coords = coords
 
     def tolines(self):
@@ -315,11 +321,19 @@ class Creature:
         creature = (Vs + [a] + [self.Linestring])
 
         polies = []
+        pieces = []
         for l in creature:
-            polies.append(Polygon(l.buffer(0.5)))
+            # polies.append(Polygon(l.buffer(0.5)))
+            pieces.append(l)
 
-        creature_poly = ops.unary_union(polies)
-        creature_patch = PolygonPatch(creature_poly, fc='BLUE', alpha=0.1)
+        try:
+            with ProcessPool(nodes=2) as pool:
+                result = list(pool.uimap(buffer_line, pieces))
+        except:
+            traceback.print
+
+        creature_poly = ops.unary_union(result)
+        # creature_patch = PolygonPatch(creature_poly, fc='BLUE', alpha=0.1)
 
         self.absorbA = creature_poly
 
@@ -426,7 +440,7 @@ class Creature:
 
             try:
                 setattr(self, 'Max' + char, max(len(s)
-                                                for s in re.findall(r'[' + char + ']+', self.L_string)))
+                                                for s in re.findall(r'\[' + char + '\]+', self.L_string)))
             except:
                 setattr(self, 'Max' + char, 0)
 
@@ -446,6 +460,8 @@ class Creature:
             (self.Choices.count(2)/len(self.Choices)) *
             getattr(self, self.Params.get('fitness_metric')),
         ])
+
+        self.Generation = self.Params.get('Generation')
 
 
 class Environment:
