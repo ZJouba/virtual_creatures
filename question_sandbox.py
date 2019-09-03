@@ -139,8 +139,10 @@ if __name__ == '__main__':
                         lineA, -joint[5]/2, (joint[0], joint[1]))
 
                     try:
-                        Vs[-1] = ops.unary_union([MultiLineString(
-                            [lineA, left_line, rigt_line])] + all_r_lines[-1])
+                        # Vs[-1] = ops.unary_union([MultiLineString(
+                        #     [lineA, left_line, rigt_line])] + all_r_lines[-1])
+                        Vs[-1] = [MultiLineString(
+                            [lineA, left_line, rigt_line])] + all_r_lines[-1]
                     except:
                         Vs.append(MultiLineString(
                             [lineA, left_line, rigt_line]))
@@ -157,7 +159,8 @@ if __name__ == '__main__':
 
                     all_r_lines += [r_lines]
 
-                    Vs[-1] = ops.unary_union([Vs[-1]] + r_lines)
+                    # Vs[-1] = ops.unary_union([Vs[-1]] + r_lines)
+                    Vs[-1] = [Vs[-1]] + r_lines
 
                 else:
                     """ --------------- PATCH -------------------------------- """
@@ -174,11 +177,13 @@ if __name__ == '__main__':
 
     # all_r_lines = [item for sublist in all_r_lines for item in sublist]
 
-    all_lines = Vs
+    all_lines = [item for sublist in Vs for item in sublist]
 
-    a = ops.unary_union(all_lines)
+    # a = ops.unary_union(all_lines)
 
     creature = (Vs + [linestring])
+
+    creature = [item for sublist in creature for item in sublist]
 
     # pieces = []
     # for l in creature:
@@ -231,21 +236,41 @@ if __name__ == '__main__':
     i = 0
 
     for geom in creature:
-        for line in geom:
-            for seg_start, seg_end in zip(list(line.coords), list(line.coords)[1:]):
+        if geom.type == 'MultiLineString':
+            for line in geom:
+                for seg_start, seg_end in zip(list(line.coords), list(line.coords)[1:]):
+                    G.add_edge(seg_start, seg_end)
+                    nodes[i] = (seg_start[0], seg_start[1])
+                    nodes[i+1] = (seg_end[0], seg_end[1])
+                    # ax.plot(seg_start[0], seg_start[1], 'xr')
+                    # ax.plot(seg_end[0], seg_end[1], 'xr')
+                    i += 1
+        else:
+            for seg_start, seg_end in zip(list(geom.coords), list(geom.coords)[1:]):
                 G.add_edge(seg_start, seg_end)
-                nodes[i] = (seg_start, seg_end)
+                nodes[i] = (seg_start[0], seg_start[1])
+                nodes[i+1] = (seg_end[0], seg_end[1])
+                # ax.plot(seg_start[0], seg_start[1], 'xr')
+                # ax.plot(seg_end[0], seg_end[1], 'xr')
                 i += 1
 
     # nx.draw(G)
-    print('\n')
-    print(nodes[0][0])
-    ax.plot(nodes[0][0][0], nodes[0][0][1], 'xr')
-    print('\n')
-    print(nodes[1][0])
-    ax.plot(nodes[1][0][0], nodes[1][0][1], 'xr')
-    print('\n')
-    print(nx.shortest_path(G, nodes[0][0], nodes[1][0]))
+    # print('\n')
+    # print(nodes[0][0])
+    # ax.plot(nodes[0][0][0], nodes[0][0][1], 'xr')
+    # print('\n')
+    # print(nodes[1][0])
+    # ax.plot(nodes[1][0][0], nodes[1][0][1], 'xr')
+    # print('\n')
+
+    # for loc, coor in nodes.items():
+    #     if coor == (0, 0):
+    #         n1 = loc
+    #     if coor == (-1.66, -2.02):
+    #         n2 = loc
+
+    # print(G.nodes)
+    # print(nx.shortest_path(G, (0, 0), (-1.66, -2.02)))
     # plt.show()
     # creature_poly = ops.unary_union(polies)
     # creature_patch = PolygonPatch(creature_poly, fc='BLUE', alpha=0.1)
@@ -277,8 +302,12 @@ if __name__ == '__main__':
         ax.plot(x, y)
 
     for m in all_lines:
-        for line in m:
-            x, y = line.xy
+        if m.type == 'MultiLineString':
+            for line in m:
+                x, y = line.xy
+                ax.plot(x, y, 'g--', alpha=0.25)
+        else:
+            x, y = m.xy
             ax.plot(x, y, 'g--', alpha=0.25)
 
     # for patch in polies:
