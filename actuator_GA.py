@@ -20,28 +20,23 @@ from tabulate import tabulate
 from grid_strategy import strategies
 from Tools.Classes import Limb
 
+from shapely.geometry import LineString
+
 
 def evaluate(orient_vector):
+    invalid = False
 
     l = Limb(len(orient_vector))
 
     l.build(orient_vector)
 
-    if l.invalid:
-        D = 0
-        X = 0
-        Y = 0
+    origin = np.array((0, 0))
+    dists = [np.linalg.norm(b-origin) for b in l.XY.T]
+    D = max(dists)
+    X = max(abs(l.XY[0]))
+    Y = max(abs(l.XY[1]))
 
-        Curvature = 0
-
-    else:
-        origin = np.array((0, 0))
-        dists = [np.linalg.norm(b-origin) for b in l.XY.T]
-        D = max(dists)
-        X = max(abs(l.XY[0]))
-        Y = max(abs(l.XY[1]))
-
-        Curvature = degrees(l.curvature[-1])
+    Curvature = degrees(l.curvature[-1])
 
     limb_res = [
         round(X, 2),
@@ -51,6 +46,35 @@ def evaluate(orient_vector):
         l,
         orient_vector
     ]
+
+    best_range = list(range(min(top_X[:, sort_by]),max(top_X[:, sort_by])))
+
+    if min(top_X[:, sort_by]) < limb_res[sort_by] < max(top_X[:, sort_by]):
+        to_tuple = [(x, y) for x, y in zip(l.XY[0], l.XY[1])]
+        line_check = LineString(to_tuple)
+        line_top = line_check.parallel_offset(1.9, side='left')
+        line_bottom = line_check.parallel_offset(1.9, side='left')
+
+        if not line_check.is_simple or not line_top.is_simple or not line_bottom.is_simple:
+            invalid = True
+        if line_check.is_closed or line_top.is_closed or line_bottom.is_closed:
+            invalid = True
+    
+    if invalid:
+        D = 0
+        X = 0
+        Y = 0
+
+        Curvature = 0
+
+        limb_res = [
+            round(X, 2),
+            round(Y, 2),
+            round(D, 2),
+            round(Curvature, 2),
+            l,
+            orient_vector
+        ]
 
     return limb_res
 
@@ -197,7 +221,8 @@ def GA(parameters):
     if len(metric) > 1:
         exception_string = ('Only one fitness metric allowed')
         raise Exception(exception_string)
-
+    
+    global sort_by
     sort_by = list(fitness.keys()).index(metric[0])
 
     metric = [i for i, x in criteria.items() if x]
@@ -241,6 +266,7 @@ def GA(parameters):
 
     best = 0
     top = parameters.get('Top')
+    global top_X
     top_X = np.array(results[1:top+1])
     prev_gen_top = results[1][sort_by]
     stop_criteria_counter = 0
@@ -300,7 +326,7 @@ def GA(parameters):
         iteration += 1
 
         print('\nIteration:\t{}'.format(iteration))
-        print('\nTolerance:\t{:.5E}'.format(Decimal(tol)))
+        print('\nTolerance:\t{:.10E}'.format(Decimal(tol)))
 
         delete_lines(n=4)
 
@@ -496,7 +522,7 @@ if __name__ == '__main__':
         },
         'Selection': {
             'Elite': 1,
-            'Random': (0.6, 0.05, 100),
+            'Random': 0.6,
             'Mutation': 0.05,
             'Crossover': 'rest',
         },

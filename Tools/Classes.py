@@ -591,7 +591,7 @@ class Limb:
 
             for ind, orientation in enumerate(orient_vec, 1):
                 if orientation == 'TOP':
-                    if orientation[-1] == 'BOTTOM':
+                    if orient_vec[ind-1] == 'BOTTOM':
                         angle = theta_vec[-1] + (2*Limb.theta)
                     else:
                         angle = theta_vec[-1] + Limb.theta
@@ -607,7 +607,7 @@ class Limb:
                     counter += 1
 
                 elif orientation == 'BOTTOM':
-                    if orientation[-1] == 'TOP':
+                    if orient_vec[ind-1] == 'TOP':
                         angle = theta_vec[-1] - (2*Limb.theta)
                     else:
                         angle = theta_vec[-1] - Limb.theta
@@ -631,17 +631,17 @@ class Limb:
             if np.count_nonzero(self.XY) == 0:
                 return
             else:
-                self.XY = self.XY[:, :counter]
+                self.XY = self.XY[:, :(counter+1)]
 
-            to_tuple = [(x, y) for x, y in zip(self.XY[0], self.XY[1])]
-            try:
-                line_check = LineString(to_tuple)
-                line_top = line_check.parallel_offset(1.9, side='left')
-                line_bottom = line_check.parallel_offset(1.9, side='left')
+            # to_tuple = [(x, y) for x, y in zip(self.XY[0], self.XY[1])]
+            # try:
+            #     line_check = LineString(to_tuple)
+            #     line_top = line_check.parallel_offset(1.9, side='left')
+            #     line_bottom = line_check.parallel_offset(1.9, side='left')
 
-                if not line_check.is_simple or not line_top.is_simple or not line_bottom.is_simple:
-                    self.invalid = True
-                if line_check.is_closed or line_top.is_closed or line_bottom.is_closed:
-                    self.invalid = True
-            except:
-                pass
+            #     if not line_check.is_simple or not line_top.is_simple or not line_bottom.is_simple:
+            #         self.invalid = True
+            #     if line_check.is_closed or line_top.is_closed or line_bottom.is_closed:
+            #         self.invalid = True
+            # except:
+            #     pass
