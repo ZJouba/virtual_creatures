@@ -47,8 +47,7 @@ def evaluate(orient_vector):
         orient_vector
     ]
 
-    best_range = list(range(min(top_X[:, sort_by]),max(top_X[:, sort_by])))
-
+    global top_X
     if min(top_X[:, sort_by]) < limb_res[sort_by] < max(top_X[:, sort_by]):
         to_tuple = [(x, y) for x, y in zip(l.XY[0], l.XY[1])]
         line_check = LineString(to_tuple)
@@ -59,7 +58,7 @@ def evaluate(orient_vector):
             invalid = True
         if line_check.is_closed or line_top.is_closed or line_bottom.is_closed:
             invalid = True
-    
+
     if invalid:
         D = 0
         X = 0
@@ -204,7 +203,7 @@ def GA(parameters):
     pop_size = parameters.get('Population size')
     fitness = parameters.get('Fitness Metric')
     criteria = parameters.get('Stopping criteria')
-    num_segments = parameters.get('Number of segments')
+    num_segments = parameters.get('Number of segments').get('Type')
     if num_segments == 'Integer':
         num_segments = parameters.get('Number of segments').get('Number')
     else:
@@ -221,7 +220,7 @@ def GA(parameters):
     if len(metric) > 1:
         exception_string = ('Only one fitness metric allowed')
         raise Exception(exception_string)
-    
+
     global sort_by
     sort_by = list(fitness.keys()).index(metric[0])
 
@@ -251,6 +250,9 @@ def GA(parameters):
 
     stop_crit = metric[0]
 
+    global top_X
+    top_X = np.zeros((5, 5))
+
     while len(results) <= pop_size:
         if num_segments == 0:
             orientations = [np.random.choice(
@@ -266,7 +268,7 @@ def GA(parameters):
 
     best = 0
     top = parameters.get('Top')
-    global top_X
+    # global top_X
     top_X = np.array(results[1:top+1])
     prev_gen_top = results[1][sort_by]
     stop_criteria_counter = 0
@@ -491,7 +493,7 @@ if __name__ == '__main__':
         Maximum iterations  --  If Stopping criteria = Maximum iterations; Set number of iterations here
         Tolerace            --  If Stopping criteria = Tolerance; Set tolerance here
         Patience            --  If Stopping criteria = Tolerance; Grace period (in iterations) before GA is terminated
-        Number of segments  --  Number of segments in actuator. If 'None' - becomes learnable parameter
+        Number of segments  --  Number of segments in actuator ('None' or 'Integer'). If 'None' - becomes learnable parameter
         Selection           --  GA selection percentages or integers. NB: One method must be 'rest'
                                     Elite - can be int or float
                                     Random - can be int or float or range for scheduled decrease of randomness
@@ -517,12 +519,12 @@ if __name__ == '__main__':
         'Tolerance': 1e-5,
         'Patience': 500,
         'Number of segments': {
-            'Type': 'None',
+            'Type': 'Integer',
             'Number': 15,
         },
         'Selection': {
             'Elite': 1,
-            'Random': 0.6,
+            'Random': (0.6, 0.05, 200),
             'Mutation': 0.05,
             'Crossover': 'rest',
         },
