@@ -1,5 +1,4 @@
 import numpy as np
-# LinearRing, LineString, MultiLineString, Point, Polygon, box
 from shapely.geometry import *
 from shapely import ops, affinity
 from math import radians, cos, sin, pi
@@ -13,6 +12,7 @@ import matplotlib as mpl
 import multiprocessing as mp
 import traceback
 from shapely.geometry import LineString
+import operator
 
 from pathos.multiprocessing import ProcessPool
 
@@ -553,7 +553,7 @@ class Environment:
 class Limb:
 
     delta_L = 0.78
-    theta = radians(13)
+    theta = radians(11)
 
     def __init__(self, size=15, length=1):
         self.length = length
@@ -563,10 +563,9 @@ class Limb:
     def build(self, orient_vec):
 
         self.curvature = [0]
-        self.invalid = False
 
         delta_length = self.length + Limb.delta_L
-        theta_vec = [0]
+        self.theta_vec = [0]
 
         counter = 0
 
@@ -578,70 +577,58 @@ class Limb:
             )
             raise Exception(exception_string)
 
+        empties = [1 for x in orient_vec if x == 'EMPTY']
+        if len(empties) != 0:
+            orient_vec = orient_vec[:orient_vec.index('EMPTY')]
+
+        self.orient = orient_vec
+
+        for ind, orientation in enumerate(self.orient):
+            if orientation == 'TOP':
+                angle = self.theta_vec[ind] + Limb.theta
+
+                self.XY[0, ind+1] = self.XY[0, ind] + \
+                    (delta_length * cos(angle))
+                self.XY[1, ind+1] = self.XY[1, ind] + \
+                    (delta_length * sin(angle))
+
+                self.curvature.append(angle)
+
+                self.theta_vec.append(self.theta_vec[ind] + (2*Limb.theta))
+
+                counter += 1
+
+            elif orientation == 'BOTTOM':
+                angle = self.theta_vec[ind] - Limb.theta
+
+                self.XY[0, ind+1] = self.XY[0, ind] + \
+                    (delta_length * cos(angle))
+                self.XY[1, ind+1] = self.XY[1, ind] + \
+                    (delta_length * sin(angle))
+
+                self.curvature.append(angle)
+
+                self.theta_vec.append(self.theta_vec[ind] - (2*Limb.theta))
+
+                counter += 1
+
+        # op_dict = {
+        #     'TOP': operator.ge,
+        #     'BOTTOM': operator.le,
+        # }
+
+        # check = np.diff(np.array(self.curvature))
+        # operations = list(map(op_dict.get, orient_vec))
+        # for i in range(len(check)):
+        #     if not operations[i](round(check[i]), 0):
+        #         print('Inconsistency')
+        #         print(operations[i])
+        #         print(str(check[i]))
+        #         print()
+
+        if np.count_nonzero(self.XY) == 0:
+            return
         else:
-            empties = sum([1 for x in orient_vec if x == 'EMPTY'])
-            try:
-                orient_vec = orient_vec[:orient_vec.index('EMPTY')]
-            except:
-                if empties > 0:
-                    print('Vec not cut')
-                pass
-
-            self.orient = orient_vec
-
-            for ind, orientation in enumerate(orient_vec, 1):
-                if orientation == 'TOP':
-                    if orient_vec[ind-1] == 'BOTTOM':
-                        angle = theta_vec[-1] + (2*Limb.theta)
-                    else:
-                        angle = theta_vec[-1] + Limb.theta
-
-                    self.XY[0, ind] = self.XY[0, ind-1] + \
-                        (delta_length * cos(angle))
-                    self.XY[1, ind] = self.XY[1, ind-1] + \
-                        (delta_length * sin(angle))
-
-                    self.curvature.append(angle)
-
-                    theta_vec.append(theta_vec[-1] + (2*Limb.theta))
-                    counter += 1
-
-                elif orientation == 'BOTTOM':
-                    if orient_vec[ind-1] == 'TOP':
-                        angle = theta_vec[-1] - (2*Limb.theta)
-                    else:
-                        angle = theta_vec[-1] - Limb.theta
-
-                    self.XY[0, ind] = self.XY[0, ind-1] + \
-                        (delta_length * cos(angle))
-                    self.XY[1, ind] = self.XY[1, ind-1] + \
-                        (delta_length * sin(angle))
-
-                    self.curvature.append(angle)
-
-                    theta_vec.append(theta_vec[-1] - (2*Limb.theta))
-                    counter += 1
-
-            # self.midpoints = [[], []]
-            # for i in range(self.XY.shape[1]-1):
-            #     self.midpoints[0].append((self.XY[0][i] + self.XY[0][i+1])/2)
-            #     self.midpoints[1].append((self.XY[1][i] + self.XY[1][i+1])/2)
-            # self.midpoints = np.asarray(self.midpoints)
-
-            if np.count_nonzero(self.XY) == 0:
-                return
-            else:
-                self.XY = self.XY[:, :(counter+1)]
-
-            # to_tuple = [(x, y) for x, y in zip(self.XY[0], self.XY[1])]
-            # try:
-            #     line_check = LineString(to_tuple)
-            #     line_top = line_check.parallel_offset(1.9, side='left')
-            #     line_bottom = line_check.parallel_offset(1.9, side='left')
-
-            #     if not line_check.is_simple or not line_top.is_simple or not line_bottom.is_simple:
-            #         self.invalid = True
-            #     if line_check.is_closed or line_top.is_closed or line_bottom.is_closed:
-            #         self.invalid = True
-            # except:
-            #     pass
+            temp = np.copy(self.XY[:, :(counter+1)])
+            self.XY = temp
+            print()

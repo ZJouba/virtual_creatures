@@ -2,18 +2,25 @@ import itertools
 import multiprocessing as mp
 import os
 import sys
+import operator
+import copy
+import time
 from datetime import datetime
 from decimal import Decimal
-from math import atan2, cos, degrees, radians
+from math import atan2, cos, degrees, radians, sin, tan, pi
+
 
 import matplotlib.cm as cm
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.polynomial import Polynomial as P
 from matplotlib import transforms
 from matplotlib.offsetbox import (AnnotationBbox, DrawingArea, OffsetImage,
                                   TextArea)
 from matplotlib.ticker import MultipleLocator
+from matplotlib.collections import PatchCollection
+import matplotlib.patches as patches
 from scipy import ndimage
 from tabulate import tabulate
 
@@ -21,21 +28,44 @@ from grid_strategy import strategies
 from Tools.Classes import Limb
 
 from shapely.geometry import LineString
+from scipy.spatial.distance import cdist
 
 
-def evaluate(orient_vector):
+def evaluate(orient_vector, first=False):
+
+    global top_X, parameters
+
     invalid = False
 
     l = Limb(len(orient_vector))
 
     l.build(orient_vector)
 
-    origin = np.array((0, 0))
-    dists = [np.linalg.norm(b-origin) for b in l.XY.T]
-    D = max(dists)
-    X = max(abs(l.XY[0]))
-    Y = max(abs(l.XY[1]))
+    data = np.copy(l.XY)
 
+    origin = np.array((0, 0))
+    point = np.array((data[0][-1], data[1][-1]))
+    D = np.linalg.norm(point-origin)
+    X = data[0][-1]
+    Y = data[1][-1]
+
+    if any(value == True for value in parameters.get('Curve fitting').values()):
+        m = data[0][-1]/(2*pi)
+        if parameters.get('Curve fitting').get('Sin'):
+            curve = np.sin(data[0]/m)
+        elif parameters.get('Curve fitting').get('Cos'):
+            curve = np.cos(data[0]/m)-1
+        elif parameters.get('Curve fitting').get('Custom'):
+            curve = []
+            func = parameters.get('Curve fitting').get('Custom func')
+            for ea in data[0]/m:
+                x = ea
+                curve.append(eval(func))
+
+        curve_fit = cdist([data[1]], [curve], 'sqeuclidean')
+    else:
+        curve_fit = 0
+    
     Curvature = degrees(l.curvature[-1])
 
     limb_res = [
@@ -43,28 +73,45 @@ def evaluate(orient_vector):
         round(Y, 2),
         round(D, 2),
         round(Curvature, 2),
-        l,
-        orient_vector
+        orient_vector,
+        curve_fit,
     ]
 
-    global top_X
-    if min(top_X[:, sort_by]) < limb_res[sort_by] < max(top_X[:, sort_by]):
-        to_tuple = [(x, y) for x, y in zip(l.XY[0], l.XY[1])]
-        line_check = LineString(to_tuple)
-        line_top = line_check.parallel_offset(1.9, side='left')
-        line_bottom = line_check.parallel_offset(1.9, side='left')
+    lowest = min(np.array(top_X)[:,sort_by])
+    highest = max(np.array(top_X)[:,sort_by])
 
-        if not line_check.is_simple or not line_top.is_simple or not line_bottom.is_simple:
-            invalid = True
-        if line_check.is_closed or line_top.is_closed or line_bottom.is_closed:
-            invalid = True
+    if (lowest < limb_res[sort_by] < highest) or first:
+        lines = []
+        to_tuple = [(x, y) for x, y in zip(data[0], data[1])]
+        lines.append(LineString(to_tuple))
+        try:
+            lines.append(lines[0].parallel_offset(1.9, side='left'))
+        except:
+            pass
+        
+        try:
+            lines.append(lines[0].parallel_offset(1.9, side='right'))
+        except:
+            pass
+
+        for line in lines:
+            if not line.is_simple or line.is_closed:
+                invalid = True
 
     if invalid:
-        D = 0
-        X = 0
-        Y = 0
+        if descending:
+            D = 0
+            X = 0
+            Y = 0
 
-        Curvature = 0
+            Curvature = 0
+
+        else:
+            D = 99999
+            X = 99999
+            Y = 99999
+
+            Curvature = 99999
 
         limb_res = [
             round(X, 2),
@@ -75,11 +122,16 @@ def evaluate(orient_vector):
             orient_vector
         ]
 
+
     return limb_res
 
 
 def selection(generation_data, num_segments, elite, randomised, mutation, crossover):
     global random_array
+
+    for i in range(len(generation_data[0])):
+        if isinstance(generation_data[0][i],list):
+            vec_ind = i
 
     if isinstance(elite, float):
         elite = int(len(generation_data) * elite)
@@ -106,44 +158,44 @@ def selection(generation_data, num_segments, elite, randomised, mutation, crosso
     new_generation_data = []
 
     for i in range(elite):
-        new_generation_data.append(generation_data[i][5])
+        new_generation_data.append(generation_data[i][vec_ind])
 
     if isinstance(num_segments, int):
         for i in range(randomised):
-            orient = [np.random.choice(["TOP", "BOTTOM", "EMPTY"])
+            new_vec = [np.random.choice(choices)
                       for _ in range(num_segments)]
-            new_generation_data.append(orient)
+            new_generation_data.append(new_vec)
     else:
         for i in range(randomised):
             top_margin = len(elite[0]) + 5
             bottom_margin = len(elite[0]) - 5
-            orient = [np.random.choice(
-                ["TOP", "BOTTOM", "EMPTY"]) for _ in range(np.random.randint(bottom_margin, top_margin))]
-            new_generation_data.append(orient)
+            new_vec = [np.random.choice(
+                choices) for _ in range(np.random.randint(bottom_margin, top_margin))]
+            new_generation_data.append(new_vec)
 
     for i in range(mutation):
-        limb = generation_data[np.random.randint(len(generation_data))][5]
+        limb = generation_data[np.random.randint(len(generation_data))][vec_ind]
         index = np.random.randint(
             low=0, high=len(limb), size=int(len(limb)*0.2))
         for place in index:
-            limb[place] = np.random.choice(["TOP", "BOTTOM", "EMPTY"])
+            limb[place] = np.random.choice(choices)
         new_generation_data.append(limb)
 
     if crossover == 'rest':
         while len(new_generation_data) < len(generation_data):
             parentA = generation_data[np.random.randint(
-                len(generation_data))][5]
+                len(generation_data))][vec_ind]
             parentB = generation_data[np.random.randint(
-                len(generation_data))][5]
+                len(generation_data))][vec_ind]
             mid = int(len(parentA) * 0.5)
             child = parentA[:mid] + parentB[mid:]
             new_generation_data.append(child)
     else:
         for i in range(crossover):
             parentA = generation_data[np.random.randint(
-                len(generation_data))][5]
+                len(generation_data))][vec_ind]
             parentB = generation_data[np.random.randint(
-                len(generation_data))][5]
+                len(generation_data))][vec_ind]
             mid = int(len(parentA) * 0.5)
             child = parentA[:mid] + parentB[mid:]
             new_generation_data.append(child)
@@ -152,12 +204,18 @@ def selection(generation_data, num_segments, elite, randomised, mutation, crosso
 
 
 def GA(parameters):
+    """ ------------------------------------------------------------------------
+    INITIALIZATION
+    -------------------------------------------------------------------------"""
+    global descending, sort_by, choices, top_X
+
     def delete_lines(n=1):
         for _ in range(n):
             sys.stdout.write('\x1b[1A')
             sys.stdout.write('\x1b[2K')
 
     i = 0
+    start = time.time()
 
     if settings.get('Save data'):
         current_directory = os.path.join(
@@ -185,8 +243,8 @@ def GA(parameters):
         "MAX Y",
         "MAX DISTANCE",
         "TOTAL CURVATURE",
-        "LIMB OBJECT",
         "ORIENTATION VECTOR",
+        "CURVE FIT",
     ]
     results = [[
         columns[0],
@@ -197,12 +255,45 @@ def GA(parameters):
         columns[5],
     ]]
 
+    """ ------------------------------------------------------------------------
+    CHECKS
+    -------------------------------------------------------------------------"""
     if settings.get('Save data'):
         generation_save_directory.write(("{}\n".format(results[0])))
 
     pop_size = parameters.get('Population size')
-    fitness = parameters.get('Fitness Metric')
-    criteria = parameters.get('Stopping criteria')
+
+    if any(value == True for value in parameters.get('Fitness Metric').get('Metrics').values()) and \
+       any(value == True for value in parameters.get('Curve fitting').values()):
+        exception_string = ('Cannot optimize for fitness metric and curve fitting at the same time. Check parameters dictionary')
+        raise Exception(exception_string)
+
+    if sum(value == True for value in parameters.get('Fitness Metric').get('Metrics').values()) > 1:
+        exception_string = (
+            'Only one fitness metric allowed. Check parameters dictionary')
+        raise Exception(exception_string)
+    
+    if sum(value == True for value in parameters.get('Fitness Metric').get('Metrics').values()) == 0 and \
+    sum(value == True for value in parameters.get('Curve fitting').values()) == 0:
+        exception_string = ('Please choose a fitness metric. Check parameters dictionary')
+        raise Exception(exception_string)
+
+
+    if sum(value == True for value in parameters.get('Curve fitting').values()) > 1:
+        exception_string = (
+            'Only one curve fit allowed. Check parameters dictionary')
+        raise Exception(exception_string)
+
+    if any(value == True for value in parameters.get('Curve fitting').values()):
+        descending = False
+        sort_by = 5
+
+    else:
+        fitness = parameters.get('Fitness Metric').get('Metrics')
+        descending = parameters.get('Fitness Metric').get('Maximise')
+        metric = [i for i, x in fitness.items() if x]
+        sort_by = list(fitness.keys()).index(metric[0])
+    
     num_segments = parameters.get('Number of segments').get('Type')
     if num_segments == 'Integer':
         num_segments = parameters.get('Number of segments').get('Number')
@@ -215,24 +306,14 @@ def GA(parameters):
     rand = parameters.get('Selection').get('Random')
     mutation = parameters.get('Selection').get('Mutation')
     crossover = parameters.get('Selection').get('Crossover')
-
-    metric = [i for i, x in fitness.items() if x]
-    if len(metric) > 1:
-        exception_string = ('Only one fitness metric allowed')
-        raise Exception(exception_string)
-
-    global sort_by
-    sort_by = list(fitness.keys()).index(metric[0])
-
-    metric = [i for i, x in criteria.items() if x]
-    if len(metric) > 1:
-        exception_string = ('Only one stopping criteria allowed')
-        raise Exception(exception_string)
+    choices = parameters.get('Choices')
+    num_top = parameters.get('Top')
 
     check_set = set(str(value).lower() for value in parameters.get(
         'Selection').values())
     if not 'rest' in check_set:
-        exception_string = ('One selection method must be set to \'rest\'')
+        exception_string = (
+            'One selection method must be set to \'rest\'. Check parameters dictionary')
         raise Exception(exception_string)
 
     cumm_percentage = 0
@@ -245,106 +326,134 @@ def GA(parameters):
             cumm_percentage += sel_value
 
     if cumm_percentage > 1:
-        exception_string = ('Cummulative selection values cannot exceed 100%')
+        exception_string = (
+            'Cummulative selection values cannot exceed 100%. Check parameters dictionary')
         raise Exception(exception_string)
-
-    stop_crit = metric[0]
-
-    global top_X
-    top_X = np.zeros((5, 5))
+    
+    """ ------------------------------------------------------------------------
+    RANDOM INITIAL POPULATION
+    -------------------------------------------------------------------------"""
+    top_X = [[0] * len(results[0])]*num_top
 
     while len(results) <= pop_size:
         if num_segments == 0:
-            orientations = [np.random.choice(
-                ["TOP", "BOTTOM", "EMPTY"]) for _ in range(np.random.randint(1, 50))]
+            orientations = [np.random.choice(choices) for _ in range(np.random.randint(1, 50))]
         else:
-            orientations = [np.random.choice(
-                ["TOP", "BOTTOM", "EMPTY"]) for _ in range(num_segments)]
+            orientations = [np.random.choice(choices)
+                            for _ in range(num_segments)]
 
-        if not orientations[0] == 'EMPTY':
-            results.append(evaluate(orientations))
+        results.append(evaluate(orientations, True))
 
-    results[1:] = sorted(results[1:], key=lambda x: x[sort_by], reverse=True)
+    new_list = results[1:]
+    new_list.sort(key=lambda x: x[sort_by], reverse=descending)
+    results = new_list
 
+    indi_time = 0
     best = 0
-    top = parameters.get('Top')
-    # global top_X
-    top_X = np.array(results[1:top+1])
-    prev_gen_top = results[1][sort_by]
+    top = parameters.get('Top')+1
+    top_X = copy.deepcopy(results[:top])
     stop_criteria_counter = 0
+    iterations = 0
     stop = False
     iteration = 0
 
     while not stop:
-        new_generation = selection(
-            results[1:], num_segments, elite, rand, mutation, crossover)
-        results = [["MAX X", "MAX Y", "MAX DISTANCE",
-                    "TOTAL CURVATURE", "LIMB OBJECT", "ORIENTATION VECTOR"]]
+        indi_s_time = time.time()
 
-        if settings.get('Multiprocessing'):
-            with mp.Pool(mp.cpu_count()) as pool:
-                mp_get = list(pool.imap_unordered(evaluate, new_generation))
-            results += mp_get
+        new_generation = selection(results, num_segments, elite, rand, mutation, crossover)
+
+        results = [evaluate(ea) for ea in new_generation]
+
+        results.sort(key=lambda x: x[sort_by], reverse=descending)
+
+        gen_top = results[0][sort_by]
+
+        lowest = float(min(np.array(top_X)[:,sort_by]))
+        highest = float(max(np.array(top_X)[:,sort_by]))
+
+        top_range = np.arange(lowest, highest)
+
+        if descending:
+            op = operator.ge 
         else:
-            for ea in new_generation:
-                results.append(evaluate(ea))
+            op = operator.le 
 
-        results[1:] = sorted(
-            results[1:], key=lambda x: x[sort_by], reverse=True)
+        if gen_top in top_range:
+            for place in range(top-2):
+                if op(gen_top, top_X[place][sort_by]):
+                    new_place = place
 
-        this_gen_top = results[1][sort_by]
 
-        new_place = top-1
-        if not this_gen_top in top_X[:, sort_by]:
-            for place in range(top-1, 0, -1):
-                if this_gen_top > top_X[place, sort_by]:
-                    new_place -= 1
-                    if new_place == 0:
-                        break
+            for i in range(new_place, top-2):
+                top_X[i+1] = top_X[i]
 
-            for i in range(top-1, new_place, -1):
-                top_X[i] = top_X[i-1]
+            top_X[new_place] = results[0]
 
-            top_X[new_place] = results[1]
+        best = top_X[0][sort_by]
 
-        if this_gen_top > best:
-            best_limb = results[1]
-            best = results[1][sort_by]
+        if descending:
+            op = operator.gt
+        else:
+            op = operator.lt 
 
-        if stop_crit == 'Maximum iterations':
-            stop_criteria_counter += 1
-            if stop_criteria_counter > maximum:
+        if parameters.get('Stopping criteria').get('Maximum iterations') and parameters.get('Stopping criteria').get('Tolerance'):
+            iterations += 1
+            if iterations > maximum:
                 stop = True
-        elif stop_crit == 'Tolerance':
-            tol = abs(prev_gen_top - this_gen_top)
-            if tol < tolerance:
+            if op(best, gen_top):
                 stop_criteria_counter += 1
             else:
                 stop_criteria_counter = 0
             if stop_criteria_counter > patience:
                 stop = True
+        elif parameters.get('Stopping criteria').get('Tolerance'):
+            if op(best, gen_top):
+                stop_criteria_counter += 1
+            else:
+                stop_criteria_counter = 0
 
-        prev_gen_top = results[1][sort_by]
+            if stop_criteria_counter > patience:
+                stop = True
+        elif parameters.get('Stopping criteria').get('Maximum iterations'):
+            iterations += 1
+            if iterations > maximum:
+                stop = True
+
         iteration += 1
 
         print('\nIteration:\t{}'.format(iteration))
-        print('\nTolerance:\t{:.10E}'.format(Decimal(tol)))
+        print('\nTop value:\t{}'.format(float(best)))
 
         delete_lines(n=4)
+
+        indi_e_time = time.time()
+
+        indi_time += (indi_e_time - indi_s_time)/pop_size
 
         if settings.get('Save data'):
             for line in results[1:]:
                 generation_save_directory.write(("{}\n".format(line)))
-
+    
+    avg_time = indi_time/iteration
+    end = time.time()
     print("\n" + 200*"-")
-    print("\nSTOPPING CRITERIA REACHED")
+    if iterations > maximum:
+        print("\nMAXIMUM ITERATIONS REACHED\n")
+    else:
+        print("\nSTOPPING CRITERIA REACHED\n")
+    print("Number of iterations:\t{}\n".format(iteration))
+    print("Duration:\t{:.5f} s\n".format(end - start))
+    print("Average duration per individual:\t{:.5f} s".format(avg_time))
     print("\n" + 200*"-")
 
     if settings.get('Save data'):
         generation_save_directory.close()
 
+    check = [evaluate(ea) for ea in np.array(top_X)[:,4]]
+    check.sort(key=lambda x: x[sort_by], reverse=descending)
+
     if settings.get('Plot final'):
-        plot_limb(top_X[:, 4])
+        plot_limb(check)
 
 
 def plot_limb(limbs):
@@ -383,19 +492,33 @@ def plot_limb(limbs):
 
     zoomed_axes = [None]
 
-    num_plots = len(limbs)
+    for i in range(len(limbs[0])):
+        if isinstance(limbs[0][i],list):
+            vec_ind = i
+
+    limbs = np.array(limbs)    
+
+    if len(limbs.shape) > 1:
+        num_plots = len(limbs)
+        limbs = limbs[:,vec_ind]
+    else:
+        num_plots = len(limbs.shape)
+        limbs = [limbs]
 
     specs = strategies.SquareStrategy('center').get_grid(num_plots)
 
     fig = plt.figure(1, constrained_layout=False)
     fig.canvas.set_window_title('Top ' + str(num_plots))
 
-    for limb, sub in zip(limbs, specs):
+    for vec, sub in zip(limbs, specs):
         ax = fig.add_subplot(sub)
 
-        segs = limb.XY.shape[1]
+        limb = Limb()
+        limb.build(vec)
 
-        points = limb.XY
+        segs = len(limb.orient)
+
+        points = np.copy(limb.XY)
         rots = limb.curvature
 
         ax.set_title("Soft actuator\n" + "Number of segments: {}".format(segs))
@@ -408,27 +531,51 @@ def plot_limb(limbs):
             colors = cm.rainbow(np.linspace(0, 1, segs))
             """------NORMAL-------"""
             for i in range(0, segs-1):
-                ax.plot([i, i+1], [0, 0], color=colors[i])
+                ax.plot([i, i+2], [0, 0], color=colors[i])
             """------ACTUATED-------"""
             for i in range(0, segs-1):
                 ax.plot(points[0, i:i+2], points[1, i:i+2], color=colors[i])
         else:
             """------NORMAL-------"""
-            normal = np.zeros((15))
+            normal = np.zeros((16))
             ax.plot(normal, color='grey',
                     label="Initial pressure (P=P" + r'$_i$' + ")")
             """------ACTUATED-------"""
             ax.plot(points[0, :], points[1, :], color='red',
                     label="Final pressure (P=P" + r'$_f$' + ")")
 
+        if any(value == True for value in parameters.get('Curve fitting').values()):
+            m = points[0][-1]/(2*pi)
+            if parameters.get('Curve fitting').get('Sin'):
+                curve = np.sin(points[0]/m)
+            elif parameters.get('Curve fitting').get('Cos'):
+                curve = np.cos(points[0]/m)-1
+            elif parameters.get('Curve fitting').get('Custom'):
+                curve = []
+                func = parameters.get('Curve fitting').get('Custom func')
+                for ea in points[0]/m:
+                    x = ea
+                    curve.append(eval(func))
+
+            ax.plot(points[0], curve, color='black', alpha=0.85, linestyle='--', label='Desired shape')
+        
         ax.margins(0.5, 0.5)
         ax.set_aspect('equal', adjustable='datalim')
         ax.autoscale(False)
 
+        if settings.get('Plot boundaries'):
+            to_tuple = [(x, y) for x, y in zip(limb.XY[0], limb.XY[1])]
+            line_check = LineString(to_tuple)
+            line_top = line_check.parallel_offset(1.9, side='left')
+            line_bottom = line_check.parallel_offset(1.9, side='right')
+
+            ax.plot(line_top.xy[0], line_top.xy[1])
+            ax.plot(line_bottom.xy[0], line_bottom.xy[1])
+
         if settings.get('Overlay images'):
             def imshow_affine(ax, z, *args, **kwargs):
                 im = ax.imshow(z, *args, **kwargs)
-                x1, x2, y1, y2 = im.get_extent()
+                _, x2, y1, _ = im.get_extent()
                 im._image_skew_coordinate = (x2, y1)
                 return im
 
@@ -436,11 +583,11 @@ def plot_limb(limbs):
             height = 3.9
 
             image_directory = os.path.dirname(
-                os.path.realpath(__file__)) + '\\box1.PNG'
+                os.path.realpath(__file__)) + '\\BOX.PNG'
             img = plt.imread(image_directory, format='png')
 
             cps = [[], []]
-            for i in range(points.shape[1]-1):
+            for i in range(segs):
                 cps[0].append((points[0][i] + points[0][i+1])/2)
                 cps[1].append((points[1][i] + points[1][i+1])/2)
             cps = np.asarray(cps)
@@ -453,25 +600,21 @@ def plot_limb(limbs):
                     extent=[0, width, 0, height],
                 )
 
-                c_x, c_y = width/2, 1.7
+                c_x, c_y = width/2, (1.75*cos(radians(11)))
 
                 if limb.orient[i] == "TOP":
-                    angle = 180 + degrees(rots[i+1])
+                    rot_angle = 180 + degrees(rots[i+1])
                 elif limb.orient[i] == "BOTTOM":
-                    angle = degrees(rots[i+1])
+                    rot_angle = degrees(rots[i+1])
                 else:
-                    angle = degrees(rots[i+1])
+                    rot_angle = degrees(rots[i+1])
 
                 transform_data = (transforms.Affine2D()
-                                  .rotate_deg_around(c_x, c_y, angle)
+                                  .rotate_deg_around(c_x, c_y, rot_angle)
                                   .translate((cps[0][i]-c_x), (cps[1][i]-c_y))
                                   + ax.transData)
 
                 img_show.set_transform(transform_data)
-
-    for m in limbs:
-        print(tabulate(m.XY))
-        print(m.orient)
 
     plt.tight_layout()
     figManager = plt.get_current_fig_manager()
@@ -486,6 +629,7 @@ if __name__ == '__main__':
 
     Parameters:
         Fitness Metric      --  Metric by which each individual in a population is evaluated (choose one by changing to True)
+        Curve fitting       --  Curve to fit actuator shape to. Custom functions must use 'x' as variable. 
         Population size     --  Population size of the GA
         Stopping criteria   --  Determines when the GA stops (choose one by changing to True)
                                     Tolerance - Fitness metric difference between subsequent generations' best individual
@@ -502,42 +646,59 @@ if __name__ == '__main__':
                                     Crossover - can be int or float
         Top                 --  Number of top individuals to save
     """
+    global parameters, settings
 
+    def test(vec):
+        plot_limb(vec)
+        
     parameters = {
         'Fitness Metric': {
-            'Maximum X-coordinate': False,
-            'Maximum Y-coordinate': False,
-            'Maximum distance from origin': False,
-            'Maximum curve': True,
+            'Maximise': False,
+            'Metrics': {
+                'X-coordinate': False,
+                'Y-coordinate': False,
+                'Distance from origin': False,
+                'Curve': False,
+            }
         },
-        'Population size': 500,
+        'Curve fitting': {
+            'Sin': False,
+            'Cos': False,
+            'Custom': True,
+            'Custom func': 'x**0.5', # x**2, x**0.5, 2**x
+        },
+        'Population size': 1000,
         'Stopping criteria': {
-            'Maximum iterations': False,
+            'Maximum iterations': True,
             'Tolerance': True,
         },
-        'Maximum iterations': 100,
+        'Maximum iterations': 50,
         'Tolerance': 1e-5,
-        'Patience': 500,
+        'Patience': 5, 
         'Number of segments': {
             'Type': 'Integer',
             'Number': 15,
         },
         'Selection': {
             'Elite': 1,
-            'Random': (0.6, 0.05, 200),
-            'Mutation': 0.05,
+            'Random': (0.6, 0.05, 50),
+            'Mutation': 0.30,
             'Crossover': 'rest',
         },
-        'Top': 6,
+        'Top': 4,
+        'Choices': ['BOTTOM', 'TOP'],
+        'Segment width': 1,
     }
-
-    global settings
+ 
     settings = {
         'Multiprocessing': False,
         'Plot final': True,
         'Rainbow': False,
         'Overlay images': True,
         'Save data': False,
+        'Plot boundaries': False,
     }
+
+    # test(15*['TOP'])
 
     GA(parameters)

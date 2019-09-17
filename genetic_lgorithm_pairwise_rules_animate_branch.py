@@ -67,9 +67,9 @@ def genPop(GA_params, predef_rules=None, listed=False):
     #     GA_params['angle'] = np.random.randint(0, 90)
 
     # for _ in range(100):
-    tracer = trace.Trace(ignoredirs=[sys.prefix, sys.exec_prefix ], trace=1, count=0, timing=True, countcallers=True)
-    tracer.runfunc(Creature, GA_params)
-    tracer.results().write_results(show_missing=False, coverdir=".")
+    # tracer = trace.Trace(ignoredirs=[sys.prefix, sys.exec_prefix ], trace=1, count=0, timing=True, countcallers=True)
+    # tracer.runfunc(Creature, GA_params)
+    # tracer.results().write_results(show_missing=False, coverdir=".")
 
     c = Creature(GA_params)
 
