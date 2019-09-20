@@ -37,7 +37,7 @@ def evaluate(orient_vector, first=False):
 
     invalid = False
 
-    l = Limb(len(orient_vector))
+    l = Limb()
 
     l.build(orient_vector)
 
