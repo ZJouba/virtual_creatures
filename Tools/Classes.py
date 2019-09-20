@@ -555,12 +555,12 @@ class Limb:
     delta_L = 0.78
     theta = radians(11)
 
-    def __init__(self, size=15, length=1):
+    def __init__(self, length=1):
         self.length = length
-        self.size = size
-        self.XY = np.zeros((2, size+1))
 
     def build(self, orient_vec):
+        self.size = len(orient_vec)
+        self.XY = np.zeros((2, self.size+1))
 
         self.curvature = [0]
 
@@ -568,14 +568,6 @@ class Limb:
         self.theta_vec = [0]
 
         counter = 0
-
-        if len(orient_vec) != self.size:
-            exception_string = (
-                'Orientation vector size must equal limb size.\n' +
-                'Orientation vector size:\t{}\n'.format(
-                    len(orient_vec)) + 'Limb size:\t{}\n'.format(self.size)
-            )
-            raise Exception(exception_string)
 
         empties = [1 for x in orient_vec if x == 'EMPTY']
         if len(empties) != 0:
