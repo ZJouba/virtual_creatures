@@ -1,14 +1,20 @@
-choices = [
-    'Forward',
-    'Curl clockwise'
-]
+import numpy as np
 
-while len(results) <= pop_size:
-    if num_segments == 0:
-        orientations = [np.random.choice(choices)
-                        for _ in range(np.random.randint(1, 50))]
-    else:
-        orientations = [np.random.choice(choices)
-                        for _ in range(num_segments)]
+if __name__ == '__main__':
+    """
+    'Extend',
+    'Curl clockwise',
+    'Curl anticlockwise',
+    """
 
-    results.append(evaluate(orientations, True))
+    choices = [
+        'E',
+        'CC',
+        'CA',
+    ]
+
+    generation = []
+
+    while len(generation) <= 500:
+        genotype = [np.random.choice(choices) for _ in range(10)]
+        generation.append(genotype)
