@@ -38,3 +38,62 @@ def plot_creature(linestring):
 
     ax.axis('equal')
     plt.show()
+
+
+def overlay_images(ax, limb):
+    import numpy as np
+    from matplotlib import transforms
+    from math import cos, radians, degrees
+    import matplotlib.pyplot as plt
+
+    def imshow_affine(ax, z, *args, **kwargs):
+        im = ax.imshow(z, *args, **kwargs)
+        _, x2, y1, _ = im.get_extent()
+        im._image_skew_coordinate = (x2, y1)
+        return im
+
+    segs = len(limb.orient)
+    rotations = limb.curvature
+    width = 2.57
+    height = 3.9
+
+    image_directory = "C:\\Users\\zjmon\\Documents\\Meesters\\virtual_creatures\\box.PNG"
+    img = plt.imread(image_directory, format='png')
+
+    cps = [[], []]
+    for i in range(segs):
+        cps[0].append((limb.XY[0][i] + limb.XY[0][i+1])/2)
+        cps[1].append((limb.XY[1][i] + limb.XY[1][i+1])/2)
+    cps = np.asarray(cps)
+
+    for i in range(cps.shape[1]):
+        img_show = imshow_affine(
+            ax,
+            img,
+            interpolation='none',
+            extent=[0, width, 0, height],
+        )
+
+        c_x, c_y = width/2, (1.75*cos(radians(11)))
+
+        if limb.orient[i] == "TOP":
+            rot_angle = 180 + degrees(rotations[i+1])
+        elif limb.orient[i] == "BOTTOM":
+            rot_angle = degrees(rotations[i+1])
+        else:
+            rot_angle = degrees(rotations[i+1])
+
+        transform_data = (transforms.Affine2D()
+                          .rotate_deg_around(c_x, c_y, rot_angle)
+                          .translate((cps[0][i]-c_x), (cps[1][i]-c_y))
+                          + ax.transData)
+
+        img_show.set_transform(transform_data)
+
+
+def delete_lines(n=1):
+    import sys
+
+    for _ in range(n):
+        sys.stdout.write('\x1b[1A')
+        sys.stdout.write('\x1b[2K')

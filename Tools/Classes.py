@@ -14,7 +14,6 @@ import traceback
 from shapely.geometry import LineString
 import operator
 
-from pathos.multiprocessing import ProcessPool
 
 
 def buffer_line(line):
@@ -623,4 +622,49 @@ class Limb:
         else:
             temp = np.copy(self.XY[:, :(counter+1)])
             self.XY = temp
-            print()
+
+
+class Actuator:
+
+    def __init__(self):
+        pass
+
+    def generate_string(self, rules, iterations):
+        """Generates the L-string of the actuator
+
+        Arguments:
+            rules {dict} -- The dictionary containing the axioms and the respective rules for each axiom
+            iterations {int} -- Number of recursions to perform
+
+        Returns:
+            String -- L-string of actuator
+        """
+
+        self.genotype = rules.get('X')[np.random.randint(1, 3)]
+        self.rules = rules
+        counter = 0
+
+        def next_char(char):
+            if char not in rules:
+                return char
+
+            return rules.get(char)[np.random.randint(1, 3)]
+
+        while counter < iterations:
+            if self.genotype.count('X') == 0:
+                break
+            else:
+                self.genotype = ''.join([next_char(c)
+                                         for c in self.genotype])
+            counter += 1
+
+    def generate_coordinates(self, choice_dict):
+        vector = [choice_dict.get(char) for char in self.genotype if char != 'X']
+        self.vector = [item for sublist in vector for item in sublist]
+        limb = Limb()
+        limb.build(self.vector)
+        self.XY = limb.XY
+            
+
+
+

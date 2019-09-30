@@ -574,7 +574,7 @@ def plot_limb(limbs):
 
         if settings.get('Overlay images'):
             def imshow_affine(ax, z, *args, **kwargs):
-                im = ax.imshow(z, *args, **kwargs)
+                im = ax.imshow(z, *args, **kwargs);
                 _, x2, y1, _ = im.get_extent()
                 im._image_skew_coordinate = (x2, y1)
                 return im

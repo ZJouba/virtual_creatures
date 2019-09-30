@@ -54,7 +54,7 @@ def progress(count, total, status=''):
 if __name__ == "__main__":
 
     params = {
-        'iterations': 10000,
+        'iterations': 100,
         'recurs': 5,
         'variables': 'X',
         'constants': 'F+-[]_',
