@@ -349,13 +349,18 @@ def GA(parameters):
     results = new_list
 
     indi_time = 0
-    best = 0
-    top = parameters.get('Top')+1
+    top = parameters.get('Top')
     top_X = copy.deepcopy(results[:top])
+    best = top_X[0][sort_by]
     stop_criteria_counter = 0
     iterations = 0
     stop = False
     iteration = 0
+
+    if descending:
+        op = operator.ge
+    else:
+        op = operator.le 
 
     while not stop:
         indi_s_time = time.time()
@@ -374,27 +379,21 @@ def GA(parameters):
         top_range = np.arange(lowest, highest)
 
         if descending:
-            op = operator.ge 
+            checker = highest
         else:
-            op = operator.le 
+            checker = lowest
 
-        if gen_top in top_range:
+        new_place = top-1
+        if (gen_top in top_range) or op(gen_top, checker):
             for place in range(top-2):
                 if op(gen_top, top_X[place][sort_by]):
                     new_place = place
-
 
             for i in range(new_place, top-2):
                 top_X[i+1] = top_X[i]
 
             top_X[new_place] = results[0]
-
-        best = top_X[0][sort_by]
-
-        if descending:
-            op = operator.gt
-        else:
-            op = operator.lt 
+            top_X.sort(key=lambda x: x[sort_by], reverse=descending)
 
         if parameters.get('Stopping criteria').get('Maximum iterations') and parameters.get('Stopping criteria').get('Tolerance'):
             iterations += 1
@@ -421,6 +420,8 @@ def GA(parameters):
 
         iteration += 1
 
+        best = top_X[0][sort_by]
+
         print('\nIteration:\t{}'.format(iteration))
         print('\nTop value:\t{}'.format(float(best)))
 
@@ -436,7 +437,7 @@ def GA(parameters):
     
     avg_time = indi_time/iteration
     end = time.time()
-    print("\n" + 200*"-")
+    print("\n" + 150*"-")
     if iterations > maximum:
         print("\nMAXIMUM ITERATIONS REACHED\n")
     else:
@@ -444,7 +445,7 @@ def GA(parameters):
     print("Number of iterations:\t{}\n".format(iteration))
     print("Duration:\t{:.5f} s\n".format(end - start))
     print("Average duration per individual:\t{:.5f} s".format(avg_time))
-    print("\n" + 200*"-")
+    print("\n" + 150*"-")
 
     if settings.get('Save data'):
         generation_save_directory.close()
@@ -617,11 +618,11 @@ def plot_limb(limbs):
                 img_show.set_transform(transform_data)
 
     plt.tight_layout()
-    figManager = plt.get_current_fig_manager()
-    figManager.window.showMaximized()
+    # figManager = plt.get_current_fig_manager()
+    # figManager.window.showMaximized()
     fig.canvas.mpl_connect('button_press_event', on_click)
     plt.show()
-    fig.canvas.manager.window.raise_()
+    # fig.canvas.manager.window.raise_()
 
 
 if __name__ == '__main__':
@@ -663,29 +664,29 @@ if __name__ == '__main__':
         },
         'Curve fitting': {
             'Sin': False,
-            'Cos': False,
-            'Custom': True,
+            'Cos': True,
+            'Custom': False,
             'Custom func': 'x**0.5', # x**2, x**0.5, 2**x
         },
-        'Population size': 1000,
+        'Population size': 100,
         'Stopping criteria': {
             'Maximum iterations': True,
             'Tolerance': True,
         },
-        'Maximum iterations': 50,
-        'Tolerance': 1e-5,
-        'Patience': 5, 
+        'Maximum iterations': 500,
+        'Tolerance': 1e-10,
+        'Patience': 100, 
         'Number of segments': {
             'Type': 'Integer',
             'Number': 15,
         },
         'Selection': {
             'Elite': 1,
-            'Random': (0.6, 0.05, 50),
-            'Mutation': 0.30,
+            'Random': (0.6, 0.05, 100),
+            'Mutation': 0.25,
             'Crossover': 'rest',
         },
-        'Top': 4,
+        'Top': 2,
         'Choices': ['BOTTOM', 'TOP'],
         'Segment width': 1,
     }
