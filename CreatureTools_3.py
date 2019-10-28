@@ -4,6 +4,7 @@ from math import radians, cos, sin, pi
 import re
 import random
 
+
 class Creature:
     """
     Generates a complete virtual creature
@@ -53,17 +54,18 @@ class Creature:
 
     def recur(self, iters):
         for _ in range(iters):
-            if (self.l_string.count('X') == 0) or (len(self.l_string) > (self.chars*2)):
+            if (self.l_string.count('X') == 0):
                 break
             else:
-                self.l_string = ''.join([self.next_char(c) for c in self.l_string])
-        
+                self.l_string = ''.join([self.next_char(c)
+                                         for c in self.l_string])
+
         if self.prune:
             if len(self.l_string) > self.chars:
                 self.l_string = self.l_string[:500]
 
         # self.l_string = self.l_string.replace('X', '')
-        
+
     def next_char(self, c):
         rule = self.rules.get(c, c)
         if not rule == c:

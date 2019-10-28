@@ -14,6 +14,36 @@ import traceback
 from shapely.geometry import LineString
 import operator
 
+from threading import Thread
+import functools
+
+
+def timeout(timeout):
+    def deco(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            res = [Exception('function [%s] timeout [%s seconds] exceeded!' % (
+                func.__name__, timeout))]
+
+            def newFunc():
+                try:
+                    res[0] = func(*args, **kwargs)
+                except Exception as e:
+                    res[0] = e
+            t = Thread(target=newFunc)
+            t.daemon = True
+            try:
+                t.start()
+                t.join(timeout)
+            except Exception as je:
+                print('Error starting thread')
+                raise je
+            ret = res[0]
+            if isinstance(ret, BaseException):
+                raise ret
+            return ret
+        return wrapper
+    return deco
 
 
 def buffer_line(line):
@@ -57,8 +87,8 @@ class Creature:
         self.L_string = params.get('axiom')
         self.Constants = params.get('constants')
         self.Variables = params.get('variables')
-        self.Joints = params.get('joints')
-        self.Joint_string = list(' ')
+        # self.Joints = params.get('joints')
+        # self.Joint_string = list(' ')
 
         if params.get('angle') == 'random':
             self.Angle = radians(np.random.randint(0, 90))
@@ -67,7 +97,7 @@ class Creature:
 
         self.recur(params.get('recurs'))
 
-        self.Joint_string = re.sub('[^YN]', '', self.Joint_string)
+        # self.Joint_string = re.sub('[^YN]', '', self.Joint_string)
 
         self.Length = params.get('length')
         self.env = params.get('env')
@@ -87,8 +117,8 @@ class Creature:
                 self.L_string = ''.join([self.next_char(c)
                                          for c in self.L_string])
 
-        self.Joint_string = ''.join(
-            [self.Joints['X'].get(i+1) for i in self.Choices])
+        # self.Joint_string = ''.join(
+        #     [self.Joints['X'].get(i) for i in self.Choices])
 
         if self.Params.get('prune'):
             self.L_string = self.L_string[:500]
@@ -129,7 +159,7 @@ class Creature:
         curr_vec = start_vec
         i = 1
 
-        joints = list(self.Joint_string)
+        # joints = list(self.Joint_string)
 
         for c in self.L_string:
             """
@@ -138,13 +168,13 @@ class Creature:
             3: Saved
             """
             if c == 'F':
-                if i == 1:
-                    coords[i, 4:7] = ('N', 0, 0)
-                else:
-                    try:
-                        coords[i, 4:7] = (joints.pop(0), 45, 0)
-                    except:
-                        pass
+                # if i == 1:
+                coords[i, 4:7] = ('N', 0, 0)
+                # else:
+                    # try:
+                    #     coords[i, 4:7] = (joints.pop(0), 45, 0)
+                    # except:
+                    #     pass
 
                 coords[i, :3] = (coords[i-1, :3] + (self.Length * curr_vec))
 
@@ -625,10 +655,10 @@ class Limb:
 
 
 class Actuator:
-
     def __init__(self):
         pass
-
+    
+    @timeout(30)
     def generate_string(self, rules, iterations):
         """Generates the L-string of the actuator
 

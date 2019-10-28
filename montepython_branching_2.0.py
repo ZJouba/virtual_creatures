@@ -1,4 +1,5 @@
-from Tools.Classes import *
+from CreatureTools_n import Creature
+from Tools.Classes import Environment
 import numpy as np
 import multiprocessing as mp
 import os
@@ -54,7 +55,7 @@ def progress(count, total, status=''):
 if __name__ == "__main__":
 
     params = {
-        'iterations': 100,
+        'iterations': 100000,
         'recurs': 5,
         'variables': 'X',
         'constants': 'F+-[]_',
@@ -70,17 +71,17 @@ if __name__ == "__main__":
     params['choices'] = list(params.get(
         'variables') + params.get('constants'))
 
-    fig, ax = plt.subplots()
+    # fig, ax = plt.subplots()
 
-    env = Environment(params)
+    # env = Environment(params)
 
-    params['env'] = env
+    # params['env'] = env
 
-    p = PolygonPatch(env.patches[0])
+    # p = PolygonPatch(env.patches[0])
 
-    ax.add_patch(p)
+    # ax.add_patch(p)
 
-    plt.show()
+    # plt.show()
 
     init_creature = genGen(params, listed=True)
 

@@ -50,14 +50,14 @@ def preProcessing(allData):
     if not isinstance(allData, pd.DataFrame):
         allData = pd.DataFrame(allData[1:], columns=allData[0])
 
-    # allData.fillna(0, inplace=True)
-    # allData.replace(np.inf, 0, inplace=True)
+    allData.fillna(0, inplace=True)
+    allData.replace(np.inf, 0, inplace=True)
 
-    # allData.drop_duplicates(subset=['L_string', 'Fitness'], inplace=True)
-    # allData.reset_index(inplace=True)
+    allData.drop_duplicates(subset=['L_string', 'Fitness'], inplace=True)
+    allData.reset_index(inplace=True)
 
     # if allData.shape[0] > 2000:
-    #     allData = allData.sample(int(allData.shape[0]*0.5), weights='Fitness')
+    allData = allData.sample(20000, weights='Area')
 
     try:
         allData['Angle'] = allData['Angle'].apply(lambda x: x*(180/pi))
@@ -130,7 +130,7 @@ def modify_doc(doc):
     dist = ColumnDataSource(data=dict(x=[0], F=[0], P=[0], M=[0]))
 
     hist, edges = np.histogram(
-        allData['S_Area'].values, bins='auto')
+        allData.select_dtypes(include=[np.number]).values, bins='auto')
     dist_dict = ColumnDataSource(dict(
         hist=hist, edges_left=edges[:-1], edges_right=edges[1:]))
 
@@ -401,33 +401,33 @@ def modify_doc(doc):
             # creature = ops.unary_union([
             #     ops.unary_union(creature_moves)] + [creature_linestring])
 
-            creature_patch = PolygonPatch(creature['absorbA'], fc='BLACK', alpha=0.1)
+            creature_patch = PolygonPatch(creature_linestring.buffer(0.5), fc='Blue') #, alpha=0.1)
 
             ax.add_patch(creature_patch)
 
-            try:
+            if isinstance(creature_linestring, MultiLineString):
                 for line in creature_linestring:
                     x, y = line.xy
                     ax.plot(x, y, 'r-', zorder=1)
-            except:
+            else:
                 x, y = creature_linestring.xy
                 ax.plot(x, y, 'r-', zorder=1)
 
-            for move in creature_moves:
-                for line in move:
-                    x, y = line.xy
-                    ax.plot(x, y, 'g--', alpha=0.25)
+            # for move in creature_moves:
+            #     for line in move:
+            #         x, y = line.xy
+            #         ax.plot(x, y, 'g--', alpha=0.25)
 
-            for p in env.patches:
-                p = PolygonPatch(p)
-                color = np.random.rand(3,)
-                p.set_color(color)
-                p.set_alpha(0.4)
-                ax.add_patch(p)
+            # for p in env.patches:
+            #     p = PolygonPatch(p)
+            #     color = np.random.rand(3,)
+            #     p.set_color(color)
+            #     p.set_alpha(0.4)
+            #     ax.add_patch(p)
 
             ax.autoscale(axis='y')
             ax.axis('equal')
-            ax.plot(0, 0, 'xr')
+            ax.plot(0, 0, 'Pr')
 
             # plt.draw()
             # fig.canvas.draw_idle()
@@ -518,7 +518,7 @@ def modify_doc(doc):
                 tabulate(creature['Coords'], headers='keys'))
 
             creature_linestring = creature['Linestring']
-            creature_moves = creature['moves']
+            # creature_moves = creature['moves']
 
             if 'F' in rules[0]:
                 r_1_coords = to_coords(rules[0], creature['Angle'])
@@ -561,7 +561,7 @@ def modify_doc(doc):
             dist.data = dists
 
             draw()
-            plt.pause(10)
+            plt.pause(20)
             # plt.show()
 
         else:
@@ -621,10 +621,10 @@ def modify_doc(doc):
     layout = column(
         row_A,
         row_B,
-        row_C,
-        row_D,
-        row_E,
-        row_F,
+        # row_C,
+        # row_D,
+        # row_E,
+        # row_F,
         row_G,
         row_H,
     )
@@ -640,7 +640,7 @@ def main():
     print('Select file...')
     print('-' * 100 + '\n')
 
-    global allData, env
+    global allData #, env
 
     root = tk.Tk()
     root.attributes("-topmost", True)
@@ -650,8 +650,8 @@ def main():
     if filepath:
         allData = pickle.load(open(filepath, 'rb'))
 
-        env_path = os.path.dirname(filepath) + '/Environment ' + filepath[-22:]
-        env = pickle.load(open(env_path, 'rb'))
+        # env_path = os.path.dirname(filepath) + '/Environment ' + filepath[-22:]
+        # env = pickle.load(open(env_path, 'rb'))
         
         # allData = tqdm.tqdm(preProcessing(allData), total=allData.shape[0], file=sys.stdout)
         allData = preProcessing(allData)

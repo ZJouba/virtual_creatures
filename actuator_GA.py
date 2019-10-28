@@ -118,7 +118,7 @@ def evaluate(orient_vector, first=False):
             round(Y, 2),
             round(D, 2),
             round(Curvature, 2),
-            l,
+            # l,
             orient_vector
         ]
 
@@ -654,17 +654,17 @@ if __name__ == '__main__':
         
     parameters = {
         'Fitness Metric': {
-            'Maximise': False,
+            'Maximise': True,
             'Metrics': {
                 'X-coordinate': False,
-                'Y-coordinate': False,
+                'Y-coordinate': True,
                 'Distance from origin': False,
                 'Curve': False,
             }
         },
         'Curve fitting': {
             'Sin': False,
-            'Cos': True,
+            'Cos': False,
             'Custom': False,
             'Custom func': 'x**0.5', # x**2, x**0.5, 2**x
         },
@@ -678,7 +678,7 @@ if __name__ == '__main__':
         'Patience': 100, 
         'Number of segments': {
             'Type': 'Integer',
-            'Number': 15,
+            'Number': 100,
         },
         'Selection': {
             'Elite': 1,
