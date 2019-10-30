@@ -50,14 +50,14 @@ def preProcessing(allData):
     if not isinstance(allData, pd.DataFrame):
         allData = pd.DataFrame(allData[1:], columns=allData[0])
 
-    allData.fillna(0, inplace=True)
-    allData.replace(np.inf, 0, inplace=True)
+    # allData.fillna(0, inplace=True)
+    # allData.replace(np.inf, 0, inplace=True)
 
-    allData.drop_duplicates(subset=['L_string', 'Fitness'], inplace=True)
-    allData.reset_index(inplace=True)
+    # allData.drop_duplicates(subset=['L_string', 'Fitness'], inplace=True)
+    # allData.reset_index(inplace=True)
 
-    # if allData.shape[0] > 2000:
-    allData = allData.sample(20000, weights='Area')
+    # # if allData.shape[0] > 2000:
+    # allData = allData.sample(20000, weights='Area')
 
     try:
         allData['Angle'] = allData['Angle'].apply(lambda x: x*(180/pi))
@@ -289,7 +289,8 @@ def modify_doc(doc):
     scatter_select = figure(**fargs,
                             title="Any scatter",
                             x_axis_label='Select metric',
-                            y_axis_label='Select metric'
+                            y_axis_label='Select metric',
+                            tooltips=tooltips1
                             )
     
 

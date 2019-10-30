@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 from decimal import Decimal
 from math import atan2, cos, degrees, radians, sin, tan, pi
-
+import pandas as pd
 
 import matplotlib.cm as cm
 import matplotlib.image as mpimg
@@ -21,6 +21,7 @@ from matplotlib.offsetbox import (AnnotationBbox, DrawingArea, OffsetImage,
 from matplotlib.ticker import MultipleLocator
 from matplotlib.collections import PatchCollection
 import matplotlib.patches as patches
+import matplotlib.image as mpimg
 from scipy import ndimage
 from tabulate import tabulate
 
@@ -29,6 +30,8 @@ from Tools.Classes import Limb
 
 from shapely.geometry import LineString
 from scipy.spatial.distance import cdist
+
+from PIL import Image
 
 
 def evaluate(orient_vector, first=False):
@@ -126,7 +129,7 @@ def evaluate(orient_vector, first=False):
     return limb_res
 
 
-def selection(generation_data, num_segments, elite, randomised, mutation, crossover):
+def selection(generation_data, num_segments, elite, randomised, mutation, crossover, probabilities):
     global random_array
 
     for i in range(len(generation_data[0])):
@@ -181,23 +184,28 @@ def selection(generation_data, num_segments, elite, randomised, mutation, crosso
             limb[place] = np.random.choice(choices)
         new_generation_data.append(limb)
 
+    def choose():
+        indices = list(range(len(generation_data)))
+        indA = np.random.choice(
+            indices,
+            p=probabilities
+        )
+        indB = np.random.choice(
+            indices,
+            p=probabilities
+        )
+        parentA = generation_data[indA][vec_ind]
+        parentB = generation_data[indB][vec_ind]
+        mid = int(len(parentA) * 0.5)
+        return parentA[:mid] + parentB[mid:]
+
     if crossover == 'rest':
         while len(new_generation_data) < len(generation_data):
-            parentA = generation_data[np.random.randint(
-                len(generation_data))][vec_ind]
-            parentB = generation_data[np.random.randint(
-                len(generation_data))][vec_ind]
-            mid = int(len(parentA) * 0.5)
-            child = parentA[:mid] + parentB[mid:]
+            child = choose()
             new_generation_data.append(child)
     else:
         for i in range(crossover):
-            parentA = generation_data[np.random.randint(
-                len(generation_data))][vec_ind]
-            parentB = generation_data[np.random.randint(
-                len(generation_data))][vec_ind]
-            mid = int(len(parentA) * 0.5)
-            child = parentA[:mid] + parentB[mid:]
+            child = choose()
             new_generation_data.append(child)
 
     return new_generation_data
@@ -299,6 +307,7 @@ def GA(parameters):
         num_segments = parameters.get('Number of segments').get('Number')
     else:
         num_segments = 0
+
     patience = parameters.get('Patience')
     maximum = parameters.get('Maximum iterations')
     tolerance = parameters.get('Tolerance')
@@ -365,7 +374,16 @@ def GA(parameters):
     while not stop:
         indi_s_time = time.time()
 
-        new_generation = selection(results, num_segments, elite, rand, mutation, crossover)
+        fitnesses = [item[sort_by] for item in results]
+        min_shifted = abs(min(fitnesses))
+        fitnesses = list(map(lambda x: x + min_shifted, fitnesses))
+        if sum(fitnesses) == 0:
+            probabilities = pop_size*[1/pop_size]
+        else:
+            total = sum(fitnesses)
+            probabilities = list(map(lambda x: x/total, fitnesses))
+
+        new_generation = selection(results, num_segments, elite, rand, mutation, crossover, probabilities)
 
         results = [evaluate(ea) for ea in new_generation]
 
@@ -474,6 +492,10 @@ def plot_limb(limbs):
             ax.legend(loc='best')
             ax.get_xaxis().set_visible(True)
             ax.get_yaxis().set_visible(True)
+            ax.xaxis.set_major_locator(MultipleLocator(5))
+            ax.grid(linestyle=':')
+            ax.set_ylim(0)
+            ax.margins(x=0, y=-0.25)
 
             for axis in event.canvas.figure.axes:
                 if axis is not ax:
@@ -506,6 +528,17 @@ def plot_limb(limbs):
         num_plots = len(limbs.shape)
         limbs = [limbs]
 
+    # fig = vp.Fig(size=(600,500), show=False)
+
+    # limb = Limb()
+    # limb.build(limbs[0])
+
+    # points = np.copy(limb.XY)
+
+    # line = fig[0, 0].plot((points[0, :], points[1, :]), color='red')
+
+    # fig.show(run=True)
+
     specs = strategies.SquareStrategy('center').get_grid(num_plots)
 
     fig = plt.figure(1, constrained_layout=False)
@@ -523,10 +556,10 @@ def plot_limb(limbs):
         rots = limb.curvature
 
         ax.set_title("Soft actuator\n" + "Number of segments: {}".format(segs))
-        ax.get_xaxis().set_visible(False)
-        ax.get_yaxis().set_visible(False)
+        # ax.get_xaxis().set_visible(False)
+        # ax.get_yaxis().set_visible(False)
         ax.plot([0, 0], [-2, 2], color='black')
-        ax.xaxis.set_major_locator(MultipleLocator(1))
+        # ax.xaxis.set_major_locator(MultipleLocator(1))
 
         if settings.get('Rainbow'):
             colors = cm.rainbow(np.linspace(0, 1, segs))
@@ -538,7 +571,7 @@ def plot_limb(limbs):
                 ax.plot(points[0, i:i+2], points[1, i:i+2], color=colors[i])
         else:
             """------NORMAL-------"""
-            normal = np.zeros((16))
+            normal = np.zeros((segs+1))
             ax.plot(normal, color='grey',
                     label="Initial pressure (P=P" + r'$_i$' + ")")
             """------ACTUATED-------"""
@@ -560,9 +593,15 @@ def plot_limb(limbs):
 
             ax.plot(points[0], curve, color='black', alpha=0.85, linestyle='--', label='Desired shape')
         
-        ax.margins(0.5, 0.5)
+        # ax.margins(0.5, 0.5)
         ax.set_aspect('equal', adjustable='datalim')
-        ax.autoscale(False)
+        ax.legend(loc='best')
+        # ax.get_xaxis().set_visible(True)
+        # ax.get_yaxis().set_visible(True)
+        # ax.xaxis.set_major_locator(MultipleLocator(5))
+        ax.grid(linestyle=':')
+        # ax.set_xlim(0)
+        # ax.margins(x=0, y=-0.25)
 
         if settings.get('Plot boundaries'):
             to_tuple = [(x, y) for x, y in zip(limb.XY[0], limb.XY[1])]
@@ -584,8 +623,10 @@ def plot_limb(limbs):
             height = 3.9
 
             image_directory = os.path.dirname(
-                os.path.realpath(__file__)) + '\\BOX.PNG'
-            img = plt.imread(image_directory, format='png')
+                os.path.realpath(__file__)) + '\\box.png'
+            # img = plt.imread(image_directory, format='png')
+            # img = Image.open(image_directory)
+            img = mpimg.imread(image_directory)
 
             cps = [[], []]
             for i in range(segs):
@@ -611,16 +652,18 @@ def plot_limb(limbs):
                     rot_angle = degrees(rots[i+1])
 
                 transform_data = (transforms.Affine2D()
-                                  .rotate_deg_around(c_x, c_y, rot_angle)
-                                  .translate((cps[0][i]-c_x), (cps[1][i]-c_y))
-                                  + ax.transData)
+                                    .rotate_deg_around(c_x, c_y, rot_angle)
+                                    .translate((cps[0][i]-c_x), (cps[1][i]-c_y))
+                                    + ax.transData)
 
                 img_show.set_transform(transform_data)
+
 
     plt.tight_layout()
     # figManager = plt.get_current_fig_manager()
     # figManager.window.showMaximized()
-    fig.canvas.mpl_connect('button_press_event', on_click)
+    # fig.canvas.mpl_connect('button_press_event', on_click)
+    ax.autoscale()
     plt.show()
     # fig.canvas.manager.window.raise_()
 
@@ -659,7 +702,6 @@ if __name__ == '__main__':
                 'X-coordinate': False,
                 'Y-coordinate': True,
                 'Distance from origin': False,
-                'Curve': False,
             }
         },
         'Curve fitting': {
@@ -668,25 +710,25 @@ if __name__ == '__main__':
             'Custom': False,
             'Custom func': 'x**0.5', # x**2, x**0.5, 2**x
         },
-        'Population size': 100,
+        'Population size': 250,
         'Stopping criteria': {
             'Maximum iterations': True,
             'Tolerance': True,
         },
-        'Maximum iterations': 500,
+        'Maximum iterations': 1000,
         'Tolerance': 1e-10,
-        'Patience': 100, 
+        'Patience': 50, 
         'Number of segments': {
             'Type': 'Integer',
-            'Number': 100,
+            'Number': 1000,
         },
         'Selection': {
-            'Elite': 1,
-            'Random': (0.6, 0.05, 100),
-            'Mutation': 0.25,
+            'Elite': 5,
+            'Random': 0.1,
+            'Mutation': 0.05,
             'Crossover': 'rest',
         },
-        'Top': 2,
+        'Top': 1,
         'Choices': ['BOTTOM', 'TOP'],
         'Segment width': 1,
     }
@@ -700,6 +742,6 @@ if __name__ == '__main__':
         'Plot boundaries': False,
     }
 
-    # test(15*['TOP'])
+    # test(15*['BOTTOM'])
 
     GA(parameters)

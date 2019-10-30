@@ -20,10 +20,14 @@ def genGen(params, listed=False):
     proba1 = np.random.uniform(0, 1)
     proba2 = 1 - proba1
 
-    rule1 = ''.join([np.random.choice(params.get('choices'))
-                     for _ in range(params.get('rule_length'))])
-    rule2 = ''.join([np.random.choice(params.get('choices'))
-                     for _ in range(params.get('rule_length'))])
+    # rule1 = ''.join([np.random.choice(params.get('choices'))
+    #                  for _ in range(params.get('rule_length'))])
+    # rule2 = ''.join([np.random.choice(params.get('choices'))
+    #                  for _ in range(params.get('rule_length'))])
+
+    rule1 = 'XXXXF'
+
+    rule2 = 'FXXXX'
 
     params['rules'] = {'X': {1: rule1, 2: rule2}}
 
@@ -55,7 +59,7 @@ def progress(count, total, status=''):
 if __name__ == "__main__":
 
     params = {
-        'iterations': 100000,
+        'iterations': 1,
         'recurs': 5,
         'variables': 'X',
         'constants': 'F+-_',

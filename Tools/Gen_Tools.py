@@ -45,6 +45,7 @@ def overlay_images(ax, limb):
     from matplotlib import transforms
     from math import cos, radians, degrees
     import matplotlib.pyplot as plt
+    import matplotlib.image as mpimg
 
     def imshow_affine(ax, z, *args, **kwargs):
         im = ax.imshow(z, *args, **kwargs)
@@ -58,7 +59,7 @@ def overlay_images(ax, limb):
     height = 3.9
 
     image_directory = "C:\\Users\\zjmon\\Documents\\Meesters\\virtual_creatures\\box.PNG"
-    img = plt.imread(image_directory, format='png')
+    img = mpimg.imread(image_directory, format='png')
 
     cps = [[], []]
     for i in range(segs):

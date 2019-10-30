@@ -5,7 +5,7 @@ import time
 import tqdm
 import sys
 from itertools import product
-from math import degrees, pi, cos, sin, atan2, sqrt, floor
+from math import degrees, pi, cos, sin, atan2, sqrt, floor, ceil
 
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
@@ -16,7 +16,8 @@ from grid_strategy import strategies
 from tabulate import tabulate
 from scipy.spatial import KDTree
 from scipy.spatial.distance import cdist
-from shapely.geometry import LineString, LinearRing
+from scipy.interpolate import RegularGridInterpolator
+from shapely.geometry import LineString, LinearRing, Polygon
 from shapely.affinity import scale
 from statistics import mean
 
@@ -24,6 +25,9 @@ from Tools.Classes import Limb, Actuator
 from Tools.Gen_Tools import overlay_images, delete_lines
 
 from multiprocessing import Process
+
+def zdist(a,b):
+        return sum(np.sqrt(((a-b)**2).sum(axis=0)))
 
 
 def evaluate(vector):
@@ -107,6 +111,8 @@ def plot_limb(limbs, objt=None, curve=None):
         limb = Limb()
         limb.build(vec)
 
+        end = np.array((limb.XY[0, -num_points:],
+                        limb.XY[1, -num_points:]))
         segs = len(limb.orient)
 
         coordinates = np.copy(limb.XY)
@@ -126,8 +132,21 @@ def plot_limb(limbs, objt=None, curve=None):
 
         if isinstance(objt, np.ndarray):
             ax.plot(objt[0], objt[1], color='black')
+        elif isinstance(objt, Polygon):
+            ax.plot(objt.exterior.xy[0], objt.exterior.xy[1], color='black')
 
-        ax.plot(curve[0], curve[1])
+        ax.plot(curve[0], curve[1], color='blue')
+        # if zdist(end, curve) > zdist(end, curve[::-1]):
+        #     ax.plot([end[0], curve[0][::-1]],
+        #             [end[1], curve[1][::-1]], 
+        #             linewidth = 0.5,
+        #             linestyle= ':',
+        #             color='grey')
+        # else:   
+        #     ax.plot([end[0], curve[0]], [end[1], curve[1]],
+        #             linewidth=0.5,
+        #             linestyle=':',
+        #             color='grey')
 
         ax.margins(0.5, 0.5)
         ax.set_aspect('equal', adjustable='datalim')
@@ -201,31 +220,45 @@ def primordialSoup():
     return choice_dict
 
 
-def make_object():
+def make_object(shape):
     length = parameters.get('Gripping').get('Length')
     width = parameters.get('Gripping').get('Width')
     start = parameters.get('Gripping').get('Location')
+    X0 = start[0]
+    Y0 = start[1]
 
-    if parameters.get('Gripping').get('Object') == 'Square':
-        X = 2*[start[0]] + 2*[length + start[0]] + [start[0]]
-        Y = [start[1]] + 2*[length + start[1]] + 2*[start[1]]
-        return np.array((X, Y))
-    elif parameters.get('Gripping').get('Object') == 'Triangle':
-        X = [start[0]] + [0.5*length + start[0]] + \
-            [length + start[0]] + [start[0]]
-        Y = [start[1]] + [width + start[1]] + 2*[start[1]]
-        return np.array((X, Y))
-    elif parameters.get('Gripping').get('Object') == 'Circle':
-        X = [start[0]+(cos(2*pi/100*x)*length) for x in range(0, 101)]
-        Y = [start[1]+(sin(2*pi/100*x)*length) for x in range(0, 101)]
+    if shape == 'Square':
+        obj = Polygon([
+            (X0, Y0),
+            (X0, Y0 + length),
+            (X0 + width, Y0 + length),
+            (X0 + width, Y0)
+        ])
+        return obj
+    elif shape == 'Triangle':
+        obj = Polygon([
+            (X0, Y0),
+            (X0 + (0.5*width), Y0 + length),
+            (X0 + width, Y0),
+        ])
+        return obj
+    elif shape == 'Circle':
+        X = [(X0+length/2)+(cos(2*pi/100*x)*length/2) for x in range(0, 101)]
+        Y = [(Y0+length/2)+(sin(2*pi/100*x)*length/2) for x in range(0, 101)]
         return np.array((X, Y))
 
 
 def selection(results, popsize, choices):
 
-    elite = 1
-    randomized = int(0.20*popsize)
-    mutation = int(0.30*popsize)
+    fitnesses = [item[3] for item in results]
+    probabilities = (list(map(lambda x: 1/x, fitnesses)))
+    total = sum(probabilities)
+    probabilities = list(map(lambda x: x/total, probabilities))
+    indices = list(range(popsize))
+
+    elite = 5
+    randomized = int(0.1*popsize)
+    mutation = int(0.01*popsize)
 
     avg_len = 0
 
@@ -242,14 +275,18 @@ def selection(results, popsize, choices):
         new.append(rules[0])
 
     for _ in range(randomized):
-        l = np.random.randint(1, 6)
+        l = np.random.randint(1, parameters.get('Rule length')+1)
         avg_len += l
         rule_a = ''.join(np.random.choice(choices, l))
         rule_b = ''.join(np.random.choice(choices, l))
         new.append([rule_a, rule_b])
 
     for _ in range(mutation):
-        rule = random.choice(rules)
+        ind = np.random.choice(
+            indices,
+            p=probabilities
+        )
+        rule = rules[ind]
         a = list(rule[0])
         b = list(rule[1])
         if len(a) == 0 or len(b) == 0:
@@ -262,8 +299,16 @@ def selection(results, popsize, choices):
         new.append([''.join(a), ''.join(b)])
 
     while len(new) < popsize:
-        rule_a = random.choice(rules)
-        rule_b = random.choice(rules)
+        indA = np.random.choice(
+            indices,
+            p=probabilities
+        )
+        indB = np.random.choice(
+            indices,
+            p=probabilities
+        )
+        rule_a = rules[indA]
+        rule_b = rules[indB]
         temp_new = []
         for i in range(len(rule)):
             r_1 = list(rule_a[i])
@@ -277,6 +322,7 @@ def selection(results, popsize, choices):
 
 
 def gripper_GA(choices_dict):
+    global num_points
 
     choices_list = ['X'] + list(choices_dict.keys())
 
@@ -291,38 +337,82 @@ def gripper_GA(choices_dict):
     patience = 100
 
     results = []
-    obj = make_object()
-    centr_x = parameters.get('Gripping').get('Location')[
-        0] + (0.5*parameters.get('Gripping').get('Length'))  # + 5
-    centr_y = parameters.get('Gripping').get('Location')[
-        1] + (0.5*parameters.get('Gripping').get('Length'))  # + 5
-    radius = (parameters.get('Gripping').get('Length')*1.2)/2 + 2.5
-    obj_angle = atan2(centr_y, centr_x)
-    start_theta = 6.28319 + 1.5708 + obj_angle
-    end_theta = 6.28319 - obj_angle
+    obj = make_object(parameters.get('Gripping').get('Object'))
 
-    t_length = radius * pi
-    num_points = floor(t_length/1.78)
+    if isinstance(obj, Polygon):
+        curve = obj.buffer(1.9, join_style=1)
+        size = len(curve.exterior.xy[0])
+        q1 = int(0.35*size)
 
-    theta = np.linspace(start_theta, end_theta, num_points)
+        # fig, ax = plt.subplots()
+        # ax.plot(curve.exterior.xy[0][q1:-5], curve.exterior.xy[1][q1:-5])
+        # ax.plot(obj.exterior.xy[0], obj.exterior.xy[1], color='black')
+        # plt.axis([0, 30, 0, 30])
+        # ax.set_aspect('equal', adjustable='datalim')
 
-    x_circ = centr_x + (radius * np.cos(theta))
-    y_circ = centr_y + (radius * np.sin(theta))
+        # plt.show()
+        data = np.array((
+            curve.exterior.xy[0][q1:-5],
+            curve.exterior.xy[1][q1:-5],
+        ))
 
-    # fig, ax = plt.subplots()
+        rng = (size - 5) - q1
+        per = rng/size
+        t_length = curve.length * per
 
-    # ax.plot(x_circ, y_circ)
-    # ax.plot(obj[0], obj[1], color='black')
-    # plt.axis([0,30,0,30])
-    # ax.set_aspect('equal', adjustable='datalim')
+        num_points = floor(t_length/1.78)
 
-    # plt.show()
+        idx = np.round(np.linspace(
+            0, data.shape[1] - 1, num_points)).astype(int)
 
-    curve_fit = np.array((x_circ, y_circ))
+        curve_plot = data
+        curve_fit = data[:, idx]
+        # curve_fit = np.array(
+        #     (curve.exterior.xy[0][q1:-5], curve.exterior.xy[1][q1:-5]))
+
+        # fig, ax = plt.subplots()
+        # ax.plot(curve.exterior.xy[0][q1:-5], curve.exterior.xy[1][q1:-5])
+        # ax.plot(obj.exterior.xy[0], obj.exterior.xy[1], color='black')
+        # # plt.axis([0, 30, 0, 30])
+        # ax.set_aspect('equal', adjustable='datalim')
+        # ax.axes.get_xaxis().set_visible(False)
+        # ax.axes.get_yaxis().set_visible(False)
+
+        # plt.show()
+
+    else:
+        centr_x = parameters.get('Gripping').get('Location')[
+            0] + (0.5*parameters.get('Gripping').get('Length'))  # + 5
+        centr_y = parameters.get('Gripping').get('Location')[
+            1] + (0.5*parameters.get('Gripping').get('Length'))  # + 5
+        radius = (parameters.get('Gripping').get('Length')*1.2)/2 + 2.5
+        obj_angle = atan2(centr_y, centr_x)
+        start_theta = 6.28319 + 1.5708 + obj_angle
+        end_theta = 6.28319 - obj_angle
+
+        t_length = radius * pi
+        num_points = ceil(t_length/1.7)
+
+        theta = np.linspace(start_theta, end_theta, num_points)
+
+        x_circ = centr_x + (radius * np.cos(theta))
+        y_circ = centr_y + (radius * np.sin(theta))
+
+        # fig, ax = plt.subplots()
+
+        # ax.plot(x_circ, y_circ)
+        # ax.plot(obj[0], obj[1], color='black')
+        # plt.axis([0,30,0,30])
+        # ax.set_aspect('equal', adjustable='datalim')
+
+        # plt.show()
+
+        curve_fit = np.array((x_circ, y_circ))
+        curve_plot = curve_fit
 
     for _ in range(pop_size):
-        rule_a = ''.join(np.random.choice(choices_list, 5))
-        rule_b = ''.join(np.random.choice(choices_list, 5))
+        rule_a = ''.join(np.random.choice(choices_list, parameters.get('Rule length')))
+        rule_b = ''.join(np.random.choice(choices_list, parameters.get('Rule length')))
 
         rules = {'X': {1: rule_a, 2: rule_b}}
 
@@ -354,12 +444,30 @@ def gripper_GA(choices_dict):
             (actuator.XY[0, -num_points:], actuator.XY[1, -num_points:]))
 
         if actuator.XY.shape[1] < num_points:
-            fit = np.inf
+            fit = 999
         else:
-            fit = min(
-                sum(abs(np.hypot(*(curve_act-curve_fit)))),
-                sum(abs(np.hypot(*(curve_act-curve_fit[::-1]))))
-            )
+            # fit = min(
+            #     sum(abs(np.hypot(*(curve_act-curve_fit)))),
+            #     sum(abs(np.hypot(*(curve_act-curve_fit[::-1]))))
+            # )
+            if any((curve_act-curve_fit).sum(axis=1)) < 0:
+                penalty = 3
+            else:
+                penalty = 1
+
+            if zdist(curve_act,curve_fit) > zdist(curve_act, curve_fit[::-1]):
+                fit = (1/num_points)*zdist(curve_act,
+                                           curve_fit[::-1]) * penalty
+            else:
+                fit = (1/num_points)*zdist(curve_act, curve_fit) * penalty
+            # fit = min(
+            #     (1/num_points) * sum((abs(curve_act-curve_fit))),
+            #     (1/num_points) * sum((abs(curve_act-curve_fit[::-1])))
+            # )
+            # orient = min(
+            #     (abs(curve_act-curve_fit))),
+            #     (abs(curve_act-curve_fit[::-1])))
+            # )
 
             # fit = abs(np.linalg.norm(
             #     cdist(curve_fit, curve_act, 'sqeuclidean')))
@@ -407,14 +515,17 @@ def gripper_GA(choices_dict):
                                  for x, y in zip(actuator.XY[0], actuator.XY[1])]
 
             if not len(to_tuple_actuator) < 2:
-                to_tuple_object = [(x, y) for x, y in zip(obj[0], obj[1])]
-                object_ring = LinearRing(to_tuple_object)
-                object_ring = scale(object_ring, 1.3, 1.3)
+                if not isinstance(obj, Polygon):
+                    to_tuple_object = [(x, y) for x, y in zip(obj[0], obj[1])]
+                    object_ring = LinearRing(to_tuple_object)
+                    inter_obj = scale(object_ring, 1.3, 1.3)
+                else:
+                    inter_obj = scale(obj, 1.3, 1.3)
 
                 line = LineString(to_tuple_actuator)
 
-                if object_ring.intersects(line):
-                    fit = np.inf
+                if line.intersects(inter_obj):
+                    fit = 999
                     results.append([
                         actuator.XY,
                         actuator.vector,
@@ -444,12 +555,26 @@ def gripper_GA(choices_dict):
 
                     # if len(fit_x) < 50 or len(fit_y) < 50:
                     if actuator.XY.shape[1] < num_points:
-                        fit = np.inf
+                        fit = 999
                     else:
-                        fit = min(
-                            sum(abs(np.hypot(*(curve_act-curve_fit)))),
-                            sum(abs(np.hypot(*(curve_act-curve_fit[::-1]))))
-                        )
+                        # fit = min(
+                        #     sum(abs(np.hypot(*(curve_act-curve_fit)))),
+                        #     sum(abs(np.hypot(*(curve_act-curve_fit[::-1]))))
+                        # )
+                        # fit = min(
+                        #     (1/num_points) * sum(abs(curve_act-curve_fit)),
+                        #     (1/num_points) * sum(abs(curve_act-curve_fit[::-1]))
+                        # )
+                        if any((curve_act-curve_fit).sum(axis=1)) < 0:
+                            penalty = 3
+                        else:
+                            penalty = 1
+
+                        if zdist(curve_act, curve_fit) > zdist(curve_act, curve_fit[::-1]):
+                            fit = (1/num_points)*zdist(curve_act,
+                                                    curve_fit[::-1]) * penalty
+                        else:
+                            fit = (1/num_points)*zdist(curve_act, curve_fit) * penalty
                         # fit = abs(np.linalg.norm(
                         #     cdist(curve_fit, curve_act, 'sqeuclidean')))
 
@@ -465,7 +590,7 @@ def gripper_GA(choices_dict):
                     None,
                     None,
                     {'X': {1: '', 2: ''}},
-                    np.inf,
+                    999,
                     recurs
                 ])
         e_time = time.time()
@@ -479,8 +604,8 @@ def gripper_GA(choices_dict):
         if iteration > max_iters:
             stop = True
         if best <= results[0][3]:
-            # if best < 5:
-            counter += 1
+            if best < 5:
+                counter += 1
         else:
             best = results[0][3]
             counter = 0
@@ -495,12 +620,13 @@ def gripper_GA(choices_dict):
     print("\n" + 150*"-")
     print("\nSTOPPING CRITERIA REACHED\n")
     print("Number of iterations:\t{}\n".format(iteration))
+    print("Number of designs:\t{}\n".format(iteration * pop_size))
     print("Average duration per individual:\t{:.5f} s\n".format(avg_time))
     print("Best value:\t{} \n".format(best))
     print("Rules:\t{}\n".format(list(results[0][2].get('X').values())))
     print("Number of recursions:\t{}".format(results[0][4]))
     print("\n" + 150*"-")
-    plot_limb(results[0][1], obj, curve_fit)
+    plot_limb(results[0][1], obj, curve_plot)
 
 
 if __name__ == '__main__':
@@ -516,12 +642,12 @@ if __name__ == '__main__':
     generated_choices = primordialSoup()
 
     parameters = {
-        'Rule length': 5,
+        'Rule length': 6,
         'Gripping': {
-            'Object': 'Square',  # 'Square', 'Triangle', 'Circle'
-            'Length': 3,
-            'Width': 3,
-            'Location': (9, 9),
+            'Object': 'Triangle',  # 'Square', 'Triangle', 'Circle'
+            'Length': 4, # 4, 8, 12
+            'Width': 4, # 4, 8, 12
+            'Location': (5, 5), # 5, 10, 15
         }
     }
 
