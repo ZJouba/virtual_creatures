@@ -1,0 +1,8 @@
+numpy==1.16.4
+pandas==0.24.2
+~atplotlib==3.0.3
+scipy==1.2.1
+Shapely==1.6.4.post1
+descartes==1.1.0
+grid_strategy==0.0.1
+matplotlib==3.1.2
