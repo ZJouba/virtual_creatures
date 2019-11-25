@@ -1,30 +1,27 @@
+import logging
 import os
 import random
-import logging
-import time
-import tqdm
 import sys
+import time
 from itertools import product
-from math import degrees, pi, cos, sin, atan2, sqrt, floor, ceil
+from math import atan2, cos, degrees, floor, pi, sin, sqrt
 
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MultipleLocator
 import numpy as np
 import pandas as pd
 from grid_strategy import strategies
-from tabulate import tabulate
+from matplotlib import rc
+from matplotlib.ticker import MultipleLocator
 from scipy.spatial import KDTree
-from scipy.spatial.distance import cdist
-from scipy.interpolate import RegularGridInterpolator
-from shapely.geometry import LineString, LinearRing, Polygon
 from shapely.affinity import scale
-from statistics import mean
+from shapely.geometry import LinearRing, LineString, Polygon
 
-from Tools.Classes import Limb, Actuator
-from Tools.Gen_Tools import overlay_images, delete_lines
+from Tools.Classes import Actuator, Limb
+from Tools.Gen_Tools import delete_lines, overlay_images
 
-from multiprocessing import Process
+rc('font', **{'family': 'serif', 'serif': ['Computer Modern'], 'size': 15})
+rc('text', usetex=True)
 
 def zdist(a,b):
         return sum(np.sqrt(((a-b)**2).sum(axis=0)))
@@ -124,6 +121,7 @@ def plot_limb(limbs, objt=None, curve=None):
         ax.xaxis.set_major_locator(MultipleLocator(1))
 
         normal = np.zeros((len(vec)+1))
+        ''' PLOT UNACTUATED LINE '''
         # ax.plot(normal, color='grey',
         #         label="Initial pressure (P=P" + r'$_i$' + ")")
         """------ACTUATED-------"""
@@ -136,6 +134,7 @@ def plot_limb(limbs, objt=None, curve=None):
             ax.plot(objt.exterior.xy[0], objt.exterior.xy[1], color='black')
 
         ax.plot(curve[0], curve[1], color='blue', alpha=0.6)
+        ''' VISUALISATION OF CURVE FIT '''
         if zdist(end, curve) > zdist(end, curve[::-1]):
             ax.plot([end[0], curve[0][::-1]],
                     [end[1], curve[1][::-1]], 
@@ -146,10 +145,10 @@ def plot_limb(limbs, objt=None, curve=None):
                     linewidth=2,
                     color='green')
 
-        # ax.margins(0.5, 0.5)
+        ax.margins(0.5, 0.5)
         ax.set_aspect('equal', adjustable='datalim')
         ax.autoscale(False)
-        # overlay_images(ax, limb)
+        overlay_images(ax, limb)
 
     plt.tight_layout()
     plt.show()
@@ -264,10 +263,6 @@ def selection(results, popsize, choices):
     def getValues(x): return list(x.get('X').values())
     rules = list(map(getValues, np.array(results)[:, 2]))
     rule_array = np.array(rules)
-    r_len = max(
-        max([len(x) for x in rule_array[:, 0]]),
-        max([len(x) for x in rule_array[:, 1]]),
-    )
 
     for i in range(elite):
         new.append(rules[0])
@@ -315,11 +310,23 @@ def selection(results, popsize, choices):
             temp_new += [''.join(n_r)]
         new.append(temp_new)
 
-    # print(avg_len/randomized)
     return new
 
 
 def gripper_GA(choices_dict):
+    """
+    Parameters:
+        pop_size            --  Number of designs per generation
+        iteration           --  Iteration counter (don't alter)
+        max_iters           --  Maximum iterations before termination
+        counter             --  Counter (don't alter)
+        stop                --  Termination check (don't alter)
+        recurs              --  Number of allowed recursions of the L-string
+        dur                 --  Parameter for runtime calculations (don't alter)
+        best                --  Ranking parameter (don't alter)
+        patience            --  Number of grace iterations to wait for a better design
+
+    """
     global num_points
 
     choices_list = ['X'] + list(choices_dict.keys())
@@ -352,33 +359,12 @@ def gripper_GA(choices_dict):
         t_length = curve.length * per
 
         num_points = floor(t_length/15)
-        
-        # m = max(data.shape[0], data.shape[1])
-        # y = np.linspace(0, 1.0/m, data.shape[0])
-        # x = np.linspace(0, 1.0/m, data.shape[1])
-        # interp_func = RegularGridInterpolator((y, x), data)
-
-        # y_n, x_n = np.meshgrid(np.linspace(0, 1.0/m, 20), np.linspace(0, 1.0/m, 2))
-
-        # new_data = interp_func((x_n, y_n))
 
         idx = np.round(np.linspace(
             0, data.shape[1] - 1, num_points)).astype(int)
 
         curve_plot = data
         curve_fit = data[:, idx]
-        # curve_fit = np.array(
-        #     (curve.exterior.xy[0][q1:-5], curve.exterior.xy[1][q1:-5]))
-
-        # fig, ax = plt.subplots()
-        # ax.plot(curve.exterior.xy[0][q1:-5], curve.exterior.xy[1][q1:-5])
-        # ax.plot(obj.exterior.xy[0], obj.exterior.xy[1], color='black')
-        # ax.plot(new_data[0], new_data[1], 'go')
-        # ax.set_aspect('equal', adjustable='datalim')
-        # ax.axes.get_xaxis().set_visible(False)
-        # ax.axes.get_yaxis().set_visible(False)
-
-        # plt.show()
 
     else:
         centr_x = parameters.get('Gripping').get('Location')[
@@ -398,15 +384,6 @@ def gripper_GA(choices_dict):
         x_circ = centr_x + (radius * np.cos(theta))
         y_circ = centr_y + (radius * np.sin(theta))
 
-        # fig, ax = plt.subplots()
-
-        # ax.plot(x_circ, y_circ)
-        # ax.plot(obj[0], obj[1], color='black')
-        # plt.axis([0,30,0,30])
-        # ax.set_aspect('equal', adjustable='datalim')
-
-        # plt.show()
-
         curve_fit = np.array((x_circ, y_circ))
         curve_plot = curve_fit
 
@@ -422,34 +399,12 @@ def gripper_GA(choices_dict):
 
         actuator.generate_coordinates(choices_dict)
 
-        # plot_limb(actuator.vector, obj)
-
-        # act_X = actuator.XY[0, :]
-        # act_Y = actuator.XY[1, :]
-        # fit_x = []
-        # fit_y = []
-        # for x1, x2 in zip(act_X, act_X[1:]):
-        #     fit_x.append([
-        #         x1 * (1-t) + x2 * t for t in np.linspace(0, 1, 10)
-        #     ])
-        # for y1, y2 in zip(act_Y, act_Y[1:]):
-        #     fit_y.append([
-        #         y1 * (1-t) + y2 * t for t in np.linspace(0, 1, 10)
-        #     ])
-
-        # fit_x = [item for sublist in fit_x for item in sublist]
-        # fit_y = [item for sublist in fit_y for item in sublist]
-        # curve_act = np.array((fit_x[-num_points:], fit_y[-num_points:]))
         curve_act = np.array(
             (actuator.XY[0, -num_points:], actuator.XY[1, -num_points:]))
 
         if actuator.XY.shape[1] < num_points:
             fit = 999
         else:
-            # fit = min(
-            #     sum(abs(np.hypot(*(curve_act-curve_fit)))),
-            #     sum(abs(np.hypot(*(curve_act-curve_fit[::-1]))))
-            # )
             if any((curve_act-curve_fit).sum(axis=1)) < 0:
                 penalty = 5
             else:
@@ -460,17 +415,6 @@ def gripper_GA(choices_dict):
                                            curve_fit[::-1]) * penalty
             else:
                 fit = (1/num_points)*zdist(curve_act, curve_fit) * penalty
-            # fit = min(
-            #     (1/num_points) * sum((abs(curve_act-curve_fit))),
-            #     (1/num_points) * sum((abs(curve_act-curve_fit[::-1])))
-            # )
-            # orient = min(
-            #     (abs(curve_act-curve_fit))),
-            #     (abs(curve_act-curve_fit[::-1])))
-            # )
-
-            # fit = abs(np.linalg.norm(
-            #     cdist(curve_fit, curve_act, 'sqeuclidean')))
 
         results.append([
             actuator.XY,
@@ -502,9 +446,6 @@ def gripper_GA(choices_dict):
 
             actuator = Actuator()
 
-            # low = max(recursions-2, 0)
-            # high = max(recursions+2, 5)
-
             recurs = np.random.randint(1, 5)
 
             actuator.generate_string(new_rule, recurs)
@@ -534,37 +475,12 @@ def gripper_GA(choices_dict):
                         recurs
                     ])
                 else:
-                    # act_X = actuator.XY[0, -num_points:]
-                    # act_Y = actuator.XY[1, -num_points:]
-                    # fit_x = []
-                    # fit_y = []
-                    # for x1, x2 in zip(act_X, act_X[1:]):
-                    #     fit_x.append([
-                    #         x1 * (1-t) + x2 * t for t in np.linspace(0, 1, 10)
-                    #     ])
-                    # for y1, y2 in zip(act_Y, act_Y[1:]):
-                    #     fit_y.append([
-                    #         y1 * (1-t) + y2 * t for t in np.linspace(0, 1, 10)
-                    #     ])
-
-                    # fit_x = [item for sublist in fit_x for item in sublist]
-                    # fit_y = [item for sublist in fit_y for item in sublist]
-                    # curve_act = np.array((fit_x[-50:], fit_y[-50:]))
                     curve_act = np.array(
                         (actuator.XY[0, -num_points:], actuator.XY[1, -num_points:]))
 
-                    # if len(fit_x) < 50 or len(fit_y) < 50:
                     if actuator.XY.shape[1] < num_points:
                         fit = 999
                     else:
-                        # fit = min(
-                        #     sum(abs(np.hypot(*(curve_act-curve_fit)))),
-                        #     sum(abs(np.hypot(*(curve_act-curve_fit[::-1]))))
-                        # )
-                        # fit = min(
-                        #     (1/num_points) * sum(abs(curve_act-curve_fit)),
-                        #     (1/num_points) * sum(abs(curve_act-curve_fit[::-1]))
-                        # )
                         if any((curve_act-curve_fit).sum(axis=1)) < 0:
                             penalty = 5
                         else:
@@ -575,8 +491,6 @@ def gripper_GA(choices_dict):
                                                     curve_fit[::-1]) * penalty
                         else:
                             fit = (1/num_points)*zdist(curve_act, curve_fit) * penalty
-                        # fit = abs(np.linalg.norm(
-                        #     cdist(curve_fit, curve_act, 'sqeuclidean')))
 
                     results.append([
                         actuator.XY,
@@ -630,6 +544,22 @@ def gripper_GA(choices_dict):
 
 
 if __name__ == '__main__':
+    """Genetic Algorithm for Soft Gripping Actuator 
+
+    Parameters:
+        Rule length         --  Number of characters allowed in the L-system rule
+        Gripping            --  Settings for the gripping actuator
+                                Object      --  Specifies form of object used for gripping
+                                Length      --  Physical length of object
+                                Width       --  Physical width of object
+                                Location    --  Location (x, y) of object from origin 
+        
+    
+    Settings:
+        Plot soup           --  Show plot of developed unique sub-units
+        
+    """
+
     global settings, generated_choices
 
     logger = logging.getLogger()

@@ -580,8 +580,14 @@ class Environment:
 
 
 class Limb:
+    """
+    Generates a modular soft robotic bending actuator
+    -----------
+    delta_L     --  Change in centerline length 
+    theta       --  Angle change of sidewalls of module
 
-    # delta_L = 0.78
+    """
+
     delta_L = 5
     theta = radians(11)
 

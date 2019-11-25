@@ -46,6 +46,7 @@ def overlay_images(ax, limb):
     from math import cos, radians, degrees
     import matplotlib.pyplot as plt
     import matplotlib.image as mpimg
+    import os
 
     def imshow_affine(ax, z, *args, **kwargs):
         im = ax.imshow(z, *args, **kwargs)
@@ -55,10 +56,12 @@ def overlay_images(ax, limb):
 
     segs = len(limb.orient)
     rotations = limb.curvature
-    width = 25.7
-    height = 78
 
-    image_directory = "C:\\Users\\zjmon\\Documents\\Meesters\\virtual_creatures\\box.PNG"
+    ''' SCALE OF PLOT MUST BE ALTERED HERE '''
+    width = 22.5
+    height = 35
+
+    image_directory = os.path.dirname(os.path.realpath(__file__)) + '\\box.png'
     img = mpimg.imread(image_directory, format='png')
 
     cps = [[], []]
@@ -73,10 +76,9 @@ def overlay_images(ax, limb):
             img,
             interpolation='none',
             extent=[0, width, 0, height],
-            alpha=0.6
         )
 
-        c_x, c_y = width/2, (17.5*cos(radians(11)))
+        c_x, c_y = width/2, (16*cos(radians(11)))
 
         if limb.orient[i] == "TOP":
             rot_angle = 180 + degrees(rotations[i+1])

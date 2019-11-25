@@ -1,43 +1,26 @@
-from Tools.Plot2D3DandProfile import plotDavid
-import itertools
-import multiprocessing as mp
+import copy
+import operator
 import os
 import sys
-import operator
-import copy
 import time
 from datetime import datetime
-from decimal import Decimal
-from math import atan2, cos, degrees, radians, sin, tan, pi
-import pandas as pd
+from math import cos, degrees, pi, radians, sin
 
-from tikzplotlib import save as tksave
-
-from matplotlib import rc
-rc('font', **{'family': 'serif', 'serif': ['Computer Modern'], 'size': 15})
-rc('text', usetex=True)
 import matplotlib.cm as cm
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
-from numpy.polynomial import Polynomial as P
-from matplotlib import transforms
-from matplotlib.offsetbox import (AnnotationBbox, DrawingArea, OffsetImage,
-                                  TextArea)
-from matplotlib.ticker import MultipleLocator
-from matplotlib.collections import PatchCollection
-import matplotlib.patches as patches
-import matplotlib.image as mpimg
-from scipy import ndimage
-from tabulate import tabulate
-
 from grid_strategy import strategies
-from Tools.Classes import Limb
-
-from shapely.geometry import LineString
+from matplotlib import rc, transforms
+from matplotlib.ticker import MultipleLocator
 from scipy.spatial.distance import cdist
+from shapely.geometry import LineString
 
-from PIL import Image
+from Tools.Classes import Limb
+from Tools.Gen_Tools import overlay_images
+
+rc('font', **{'family': 'serif', 'serif': ['Computer Modern'], 'size': 15})
+rc('text', usetex=True)
 
 
 def evaluate(orient_vector, first=False):
@@ -68,8 +51,7 @@ def evaluate(orient_vector, first=False):
         elif parameters.get('Curve fitting').get('Custom'):
             curve = []
             func = parameters.get('Curve fitting').get('Custom func')
-            for ea in data[0]/m:
-                x = ea
+            for _ in data[0]/m:
                 curve.append(eval(func))
 
         curve_fit = cdist([data[1]], [curve], 'sqeuclidean')
@@ -128,7 +110,6 @@ def evaluate(orient_vector, first=False):
             round(Y, 2),
             round(D, 2),
             round(Curvature, 2),
-            # l,
             orient_vector
         ]
 
@@ -318,7 +299,6 @@ def GA(parameters):
 
     patience = parameters.get('Patience')
     maximum = parameters.get('Maximum iterations')
-    tolerance = parameters.get('Tolerance')
     elite = parameters.get('Selection').get('Elite')
     rand = parameters.get('Selection').get('Random')
     mutation = parameters.get('Selection').get('Mutation')
@@ -423,7 +403,7 @@ def GA(parameters):
             top_X[new_place] = results[0]
             top_X.sort(key=lambda x: x[sort_by], reverse=descending)
 
-        if parameters.get('Stopping criteria').get('Maximum iterations') and parameters.get('Stopping criteria').get('Tolerance'):
+        if parameters.get('Stopping criteria').get('Maximum iterations'):
             iterations += 1
             if iterations > maximum:
                 stop = True
@@ -432,18 +412,6 @@ def GA(parameters):
             else:
                 stop_criteria_counter = 0
             if stop_criteria_counter > patience:
-                stop = True
-        elif parameters.get('Stopping criteria').get('Tolerance'):
-            if op(best, gen_top):
-                stop_criteria_counter += 1
-            else:
-                stop_criteria_counter = 0
-
-            if stop_criteria_counter > patience:
-                stop = True
-        elif parameters.get('Stopping criteria').get('Maximum iterations'):
-            iterations += 1
-            if iterations > maximum:
                 stop = True
 
         iteration += 1
@@ -538,21 +506,10 @@ def plot_limb(limbs):
         num_plots = len(limbs.shape)
         limbs = [limbs]
 
-    # fig = vp.Fig(size=(600,500), show=False)
-
-    # limb = Limb()
-    # limb.build(limbs[0])
-
-    # points = np.copy(limb.XY)
-
-    # line = fig[0, 0].plot((points[0, :], points[1, :]), color='red')
-
-    # fig.show(run=True)
-
     specs = strategies.SquareStrategy('center').get_grid(num_plots)
 
     fig = plt.figure(1, constrained_layout=False)
-    # fig.canvas.set_window_title('Top ' + str(num_plots))
+    fig.canvas.set_window_title('Top ' + str(num_plots))
 
     for vec, sub in zip(limbs, specs):
         ax = fig.add_subplot(sub)
@@ -565,11 +522,7 @@ def plot_limb(limbs):
         points = np.copy(limb.XY)
         rots = limb.curvature
 
-        # ax.set_title("Soft actuator\n" + "Number of segments: {}".format(segs))
-        # ax.get_xaxis().set_visible(False)
-        # ax.get_yaxis().set_visible(False)
         ax.plot([0, 0], [-2, 2], color='black')
-        # ax.xaxis.set_major_locator(MultipleLocator(1))
 
         if settings.get('Rainbow'):
             colors = cm.rainbow(np.linspace(0, 1, segs))
@@ -581,6 +534,7 @@ def plot_limb(limbs):
                 ax.plot(points[0, i:i+2], points[1, i:i+2], color=colors[i])
         else:
             """------NORMAL-------"""
+            ''' PLOT UNACTUATED LINE HERE '''
             # normal = np.zeros((segs+1))
             # ax.plot(normal, color='grey',
                     # label="Initial pressure (P=P" + r'$_i$' + ")")
@@ -597,15 +551,10 @@ def plot_limb(limbs):
             elif parameters.get('Curve fitting').get('Custom'):
                 curve = []
                 func = parameters.get('Curve fitting').get('Custom func')
-                for ea in points[0]/m:
-                    x = ea
+                for _ in points[0]/m:
                     curve.append(eval(func))
 
             ax.plot(points[0], curve, color='black', alpha=0.85, linestyle='--', label='Desired profile')
-        
-        # ax.margins(0.5, 0.5)
-        # ax.set_xlim(0)
-        # ax.margins(x=0, y=-0.25)
 
         if settings.get('Plot boundaries'):
             to_tuple = [(x, y) for x, y in zip(limb.XY[0], limb.XY[1])]
@@ -617,62 +566,17 @@ def plot_limb(limbs):
             ax.plot(line_bottom.xy[0], line_bottom.xy[1])
 
         if settings.get('Overlay images'):
-            def imshow_affine(ax, z, *args, **kwargs):
-                im = ax.imshow(z, *args, **kwargs);
-                _, x2, y1, _ = im.get_extent()
-                im._image_skew_coordinate = (x2, y1)
-                return im
-
-            # width = 2.57
-            # height = 3.9
-
-            width = 22.5
-            height = 35
-
-            image_directory = os.path.dirname(
-                os.path.realpath(__file__)) + '\\box.png'
-            # img = plt.imread(image_directory, format='png')
-            # img = Image.open(image_directory)
-            img = mpimg.imread(image_directory)
-
-            cps = [[], []]
-            for i in range(segs):
-                cps[0].append((points[0][i] + points[0][i+1])/2)
-                cps[1].append((points[1][i] + points[1][i+1])/2)
-            cps = np.asarray(cps)
-
-            for i in range(cps.shape[1]):
-                img_show = imshow_affine(
-                    ax,
-                    img,
-                    interpolation='none',
-                    extent=[0, width, 0, height],
-                )
-
-                c_x, c_y = width/2, (16*cos(radians(11)))
-
-                if limb.orient[i] == "TOP":
-                    rot_angle = 180 + degrees(rots[i+1])
-                elif limb.orient[i] == "BOTTOM":
-                    rot_angle = degrees(rots[i+1])
-                else:
-                    rot_angle = degrees(rots[i+1])
-
-                transform_data = (transforms.Affine2D()
-                                    .rotate_deg_around(c_x, c_y, rot_angle)
-                                    .translate((cps[0][i]-c_x), (cps[1][i]-c_y))
-                                    + ax.transData)
-
-                img_show.set_transform(transform_data)
+            overlay_images(ax, limb)
+            
     diff = 20
     x_min = min(points[0, :])-diff
     x_max = max(points[0, :])+diff
     y_min = min(points[1, :])-diff
     y_max = max(points[1, :])+diff
+
+    ''' THIS SETTING ALLOWS TO FOCUS THE WINDOW ON THE SELECTED SUBPLOT IF Top > 1 '''
     # fig.canvas.mpl_connect('button_press_event', on_click)
-    # ax.set_aspect('equal', adjustable='datalim')
-    # ax.autoscale()
-    # plt.tight_layout()
+
     plt.xlim(x_min, x_max)
     plt.ylim(y_min, y_max)
     plt.xlabel('X [mm]')
@@ -680,16 +584,11 @@ def plot_limb(limbs):
     ax.xaxis.set_major_locator(MultipleLocator(20))
     
     ax.grid(linestyle=':')
-    # ax.margins(0.5, 0.1)
-    plotDavid(ax)
 
     figManager = plt.get_current_fig_manager()
     figManager.window.state('zoomed')
-    lgd = ax.legend(loc='lower center', bbox_to_anchor=(0.5, 1))
-    # plt.show()
-    plt.savefig('C:\\Users\\zjmon\\Documents\\Meesters\\Thesis\\figs\\Cos.pgf')
-                # bbox_extra_artists=(lgd,), bbox_inches='tight')
-
+    ax.legend(loc='lower center', bbox_to_anchor=(0.5, 1))
+    plt.show()
 
 
 if __name__ == '__main__':
@@ -700,11 +599,9 @@ if __name__ == '__main__':
         Curve fitting       --  Curve to fit actuator shape to. Custom functions must use 'x' as variable. 
         Population size     --  Population size of the GA
         Stopping criteria   --  Determines when the GA stops (choose one by changing to True)
-                                    Tolerance - Fitness metric difference between subsequent generations' best individual
                                     Maximum iterations - Run for X iterations
         Maximum iterations  --  If Stopping criteria = Maximum iterations; Set number of iterations here
-        Tolerace            --  If Stopping criteria = Tolerance; Set tolerance here
-        Patience            --  If Stopping criteria = Tolerance; Grace period (in iterations) before GA is terminated
+        Patience            --  Grace period (in iterations) before GA is terminated
         Number of segments  --  Number of segments in actuator ('None' or 'Integer'). If 'None' - becomes learnable parameter
         Selection           --  GA selection percentages or integers. NB: One method must be 'rest'
                                     Elite - can be int or float
@@ -713,35 +610,38 @@ if __name__ == '__main__':
                                     Mutation - can be int or float
                                     Crossover - can be int or float
         Top                 --  Number of top individuals to save
+        Choices             --  Location of the strain-limiting layer in the actuator module 
+    
+    Settings:
+        Plot final          --  Plot final actuator design(s)
+        Rainbow             --  Use different colors for each module's line segment
+        Overlay images      --  Overlay images of deformed module on reduced-order model
+        Save data           --  Saves data to text file in current directory
+        Plot boundaries     --  Show boundaries used for self-intersection check in plot
     """
     global parameters, settings
-
-    def test(vec):
-        plot_limb(vec)
         
     parameters = {
         'Fitness Metric': {
             'Maximise': False,
             'Metrics': {
-                'X-coordinate': False,
+                'X-coordinate': True,
                 'Y-coordinate': False,
                 'Distance from origin': False,
             }
         },
         'Curve fitting': {
             'Sin': False,
-            'Cos': True,
+            'Cos': False,
             'Custom': False,
-            'Custom func': 'x**0.5', # x**2, x**0.5, 2**x
+            'Custom func': 'x**0.5',
         },
         'Population size': 250,
         'Stopping criteria': {
             'Maximum iterations': True,
-            'Tolerance': True,
         },
         'Maximum iterations': 1000,
-        'Tolerance': 1e-10,
-        'Patience': 50, 
+        'Patience': 5, 
         'Number of segments': {
             'Type': 'Integer',
             'Number': 15,
@@ -754,11 +654,9 @@ if __name__ == '__main__':
         },
         'Top': 1,
         'Choices': ['BOTTOM', 'TOP'],
-        'Segment width': 1,
     }
  
     settings = {
-        'Multiprocessing': False,
         'Plot final': True,
         'Rainbow': False,
         'Overlay images': True,
@@ -766,26 +664,4 @@ if __name__ == '__main__':
         'Plot boundaries': False,
     }
 
-    # MIN X
-    # test(10*['TOP'] + ['BOTTOM', 'BOTTOM', 'TOP', 'BOTTOM', 'BOTTOM'])
-
-    # MAX X
-    # ['BOTTOM', 'TOP', 'BOTTOM', 'TOP', 'BOTTOM', 'TOP', 'TOP',
-    #     'BOTTOM', 'TOP', 'BOTTOM', 'TOP', 'BOTTOM', 'TOP', 'BOTTOM', 'TOP']
-
-    # MAX Y
-    # test(5*['TOP']+['BOTTOM', 'TOP', 'BOTTOM',
-                    # 'TOP', 'BOTTOM', 'TOP', 'BOTTOM', 'TOP', 'BOTTOM', 'TOP'])
-
-    # SIN
-    # test(['TOP', 'TOP', 'BOTTOM', 'BOTTOM', 'BOTTOM', 'BOTTOM', 'TOP', 'BOTTOM', 'TOP', 'TOP', 'BOTTOM', 'TOP', 'TOP', 'TOP', 'TOP'])
-
-    # COS
-    test(['BOTTOM', 'BOTTOM', 'BOTTOM', 'TOP', 'TOP', 'TOP', 'BOTTOM',
-          'TOP', 'TOP', 'TOP', 'TOP', 'BOTTOM', 'BOTTOM', 'BOTTOM', 'TOP'])
-
-    # test(['BOTTOM', 'TOP', 'BOTTOM', 'TOP', 'BOTTOM', 'TOP', 'TOP',
-    #     'BOTTOM', 'TOP', 'BOTTOM', 'TOP', 'BOTTOM', 'TOP', 'BOTTOM', 'TOP'])
-
-    # test(15*['BOTTOM'])
-    # GA(parameters)
+    GA(parameters)
